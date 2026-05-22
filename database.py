@@ -154,44 +154,112 @@ COACH_CHALLENGES = {
     "balanced_star": [
         {"name": "All-Around Impact", "description": "Record 20+ PTS, 5+ REB, and 5+ AST.", "bonus": 2500, "type": "balanced"},
         {"name": "Winning Basketball", "description": "Win the game and score 25+ PTS.", "bonus": 2200, "type": "win_pts"},
+        {"name": "Stat Sheet Stuffing", "description": "Record 15+ PTS, 7+ REB, and 7+ AST.", "bonus": 2800, "type": "pts_reb_ast", "pts": 15, "reb": 7, "ast": 7},
+        {"name": "Complete Game", "description": "Record 20+ PTS and 3+ stocks.", "bonus": 2600, "type": "pts_stocks", "pts": 20, "stocks": 3},
+        {"name": "Winning Engine", "description": "Win the game with 8+ AST.", "bonus": 2400, "type": "ast_win", "ast": 8},
+        {"name": "Efficient Star", "description": "Score 25+ PTS on 50%+ FG.", "bonus": 3000, "type": "pts_fg_pct", "pts": 25, "fg_pct": 0.50},
+        {"name": "Do-It-All Night", "description": "Record 10+ PTS, 10+ REB, and 10+ AST.", "bonus": 3500, "type": "triple_double"},
+        {"name": "No Weaknesses", "description": "Record 18+ PTS, 5+ REB, 5+ AST, and 2+ stocks.", "bonus": 3200, "type": "pts_reb_ast_stocks", "pts": 18, "reb": 5, "ast": 5, "stocks": 2},
     ],
+
     "sharpshooter": [
         {"name": "Green Light", "description": "Make 6+ threes.", "bonus": 2500, "type": "threes", "target": 6},
         {"name": "Spacing Gravity", "description": "Score 30+ PTS with 4+ threes.", "bonus": 3000, "type": "pts_threes", "pts": 30, "threes": 4},
+        {"name": "Flamethrower", "description": "Make 8+ threes.", "bonus": 3500, "type": "threes", "target": 8},
+        {"name": "Sniper Efficiency", "description": "Make 5+ threes while shooting 45%+ from three.", "bonus": 3200, "type": "threes_pct", "threes": 5, "three_pct": 0.45},
+        {"name": "Catch-and-Shoot Clinic", "description": "Make 4+ threes and win the game.", "bonus": 2600, "type": "threes_win", "threes": 4},
+        {"name": "Deep Range Takeover", "description": "Score 35+ PTS with 6+ threes.", "bonus": 3800, "type": "pts_threes", "pts": 35, "threes": 6},
+        {"name": "No Hesitation", "description": "Attempt 10+ threes and make 40%+ of them.", "bonus": 3000, "type": "tpa_three_pct", "tpa": 10, "three_pct": 0.40},
+        {"name": "Gravity Assist", "description": "Make 4+ threes and record 6+ AST.", "bonus": 2900, "type": "threes_ast", "threes": 4, "ast": 6},
     ],
+
     "lockdown_defender": [
         {"name": "Clamp Assignment", "description": "Record 3+ steals and hold a win.", "bonus": 2500, "type": "steals_win", "target": 3},
         {"name": "Defensive Chaos", "description": "Record 5 combined steals + blocks.", "bonus": 2800, "type": "stocks", "target": 5},
+        {"name": "Pickpocket Night", "description": "Record 4+ steals.", "bonus": 2800, "type": "steals", "target": 4},
+        {"name": "Two-Way Stopper", "description": "Record 15+ PTS and 3+ steals.", "bonus": 2700, "type": "pts_steals", "pts": 15, "stl": 3},
+        {"name": "Defensive Statement", "description": "Win the game with 4+ stocks.", "bonus": 3000, "type": "stocks_win", "stocks": 4},
+        {"name": "Transition Punisher", "description": "Record 3+ steals and 3+ dunks.", "bonus": 3000, "type": "steals_dunks", "stl": 3, "dunks": 3},
+        {"name": "Disruptor", "description": "Record 2+ steals, 2+ blocks, and win.", "bonus": 3200, "type": "stl_blk_win", "stl": 2, "blk": 2},
+        {"name": "Lockdown Triple Threat", "description": "Record 10+ PTS, 5+ REB, and 3+ stocks.", "bonus": 2900, "type": "pts_reb_stocks", "pts": 10, "reb": 5, "stocks": 3},
     ],
+
     "slashing_playmaker": [
         {"name": "Paint Touches", "description": "Get 10+ AST and 3+ dunks.", "bonus": 2800, "type": "ast_dunks", "ast": 10, "dunks": 3},
         {"name": "Rim Pressure", "description": "Attempt 8+ free throws and win.", "bonus": 2600, "type": "fta_win", "target": 8},
+        {"name": "Drive-and-Dish", "description": "Record 12+ AST.", "bonus": 2800, "type": "assists", "target": 12},
+        {"name": "Downhill Engine", "description": "Score 25+ PTS with 4+ dunks.", "bonus": 3200, "type": "pts_dunks", "pts": 25, "dunks": 4},
+        {"name": "Contact Magnet", "description": "Attempt 10+ free throws.", "bonus": 2800, "type": "fta", "target": 10},
+        {"name": "Paint Collapse", "description": "Record 20+ PTS and 10+ AST.", "bonus": 3300, "type": "pts_ast", "pts": 20, "ast": 10},
+        {"name": "Above the Defense", "description": "Record 5+ dunks and win.", "bonus": 3100, "type": "dunks_win", "dunks": 5},
+        {"name": "Triple Threat Slasher", "description": "Record 20+ PTS, 8+ AST, and 2+ dunks.", "bonus": 3400, "type": "pts_ast_dunks", "pts": 20, "ast": 8, "dunks": 2},
     ],
+
     "playmaking_shot_creator": [
         {"name": "Creator Night", "description": "Score 25+ PTS and get 10+ AST.", "bonus": 3000, "type": "pts_ast", "pts": 25, "ast": 10},
         {"name": "Shot Clock Killer", "description": "Make 10+ field goals and get 8+ AST.", "bonus": 2800, "type": "fgm_ast", "fgm": 10, "ast": 8},
+        {"name": "Midrange Maestro", "description": "Score 30+ PTS with 50%+ FG.", "bonus": 3300, "type": "pts_fg_pct", "pts": 30, "fg_pct": 0.50},
+        {"name": "Table Setter", "description": "Record 14+ AST.", "bonus": 3200, "type": "assists", "target": 14},
+        {"name": "Shot Creation Clinic", "description": "Score 35+ PTS and record 6+ AST.", "bonus": 3600, "type": "pts_ast", "pts": 35, "ast": 6},
+        {"name": "Low Turnover Lead Guard", "description": "Record 10+ AST with 2 or fewer turnovers.", "bonus": 3400, "type": "ast_low_to", "ast": 10, "to_max": 2},
+        {"name": "Pull-Up Threat", "description": "Make 3+ threes and record 8+ AST.", "bonus": 3000, "type": "threes_ast", "threes": 3, "ast": 8},
+        {"name": "Floor General Takeover", "description": "Win the game with 12+ AST.", "bonus": 3500, "type": "ast_win", "ast": 12},
     ],
+
     "two_way_finisher": [
         {"name": "Two-Way Pressure", "description": "Score 20+ PTS with 3+ stocks.", "bonus": 2700, "type": "pts_stocks", "pts": 20, "stocks": 3},
         {"name": "Above The Rim", "description": "Record 5+ dunks.", "bonus": 2500, "type": "dunks", "target": 5},
+        {"name": "Rim Runner", "description": "Score 25+ PTS with 4+ dunks.", "bonus": 3000, "type": "pts_dunks", "pts": 25, "dunks": 4},
+        {"name": "Defensive Finish", "description": "Record 3+ stocks and win.", "bonus": 2900, "type": "stocks_win", "stocks": 3},
+        {"name": "Fastbreak Menace", "description": "Record 3+ steals and 3+ dunks.", "bonus": 3100, "type": "steals_dunks", "stl": 3, "dunks": 3},
+        {"name": "Contact Finisher", "description": "Attempt 8+ free throws and score 20+ PTS.", "bonus": 3000, "type": "pts_fta", "pts": 20, "fta": 8},
+        {"name": "Athletic Two-Way Night", "description": "Record 20+ PTS, 8+ REB, and 2+ stocks.", "bonus": 3200, "type": "pts_reb_stocks", "pts": 20, "reb": 8, "stocks": 2},
+        {"name": "Poster Run", "description": "Record 6+ dunks.", "bonus": 3300, "type": "dunks", "target": 6},
     ],
+
     "rim_protector": [
         {"name": "No Fly Zone", "description": "Record 4+ blocks.", "bonus": 2700, "type": "blocks", "target": 4},
         {"name": "Paint Anchor", "description": "Record 12+ REB and 3+ BLK.", "bonus": 3000, "type": "reb_blk", "reb": 12, "blk": 3},
+        {"name": "Interior Wall", "description": "Record 5+ blocks.", "bonus": 3300, "type": "blocks", "target": 5},
+        {"name": "Glass and Swat", "description": "Record 15+ REB and 2+ BLK.", "bonus": 3200, "type": "reb_blk", "reb": 15, "blk": 2},
+        {"name": "Defensive Big Win", "description": "Win the game with 4+ stocks.", "bonus": 3000, "type": "stocks_win", "stocks": 4},
+        {"name": "Paint Double-Double", "description": "Record 10+ PTS, 10+ REB, and 2+ BLK.", "bonus": 3100, "type": "pts_reb_blk", "pts": 10, "reb": 10, "blk": 2},
+        {"name": "Rim Deterrence", "description": "Record 3+ BLK and 8+ defensive rebounds.", "bonus": 2900, "type": "blk_dreb", "blk": 3, "dreb": 8},
+        {"name": "Big Man Statement", "description": "Record 15+ PTS, 12+ REB, and 3+ BLK.", "bonus": 3600, "type": "pts_reb_blk", "pts": 15, "reb": 12, "blk": 3},
     ],
+
     "glass_cleaner": [
         {"name": "Board Man", "description": "Grab 15+ rebounds.", "bonus": 2600, "type": "rebounds", "target": 15},
         {"name": "Second Chances", "description": "Grab 5+ offensive rebounds.", "bonus": 2400, "type": "oreb", "target": 5},
+        {"name": "Rebounding Takeover", "description": "Grab 20+ rebounds.", "bonus": 3400, "type": "rebounds", "target": 20},
+        {"name": "Offensive Glass Work", "description": "Grab 7+ offensive rebounds.", "bonus": 3100, "type": "oreb", "target": 7},
+        {"name": "Possession Battle", "description": "Record 12+ REB and win.", "bonus": 2800, "type": "reb_win", "reb": 12},
+        {"name": "Dirty Work Double-Double", "description": "Record 10+ PTS and 15+ REB.", "bonus": 3200, "type": "pts_reb", "pts": 10, "reb": 15},
+        {"name": "Glass Cleaner Plus", "description": "Record 18+ REB and 2+ BLK.", "bonus": 3500, "type": "reb_blk", "reb": 18, "blk": 2},
+        {"name": "Extra Possessions", "description": "Grab 6+ offensive rebounds and win.", "bonus": 3300, "type": "oreb_win", "oreb": 6},
     ],
+
     "inside_out_scorer": [
         {"name": "Three-Level Scorer", "description": "Score 35+ PTS with 3+ threes and 2+ dunks.", "bonus": 3200, "type": "inside_out", "pts": 35, "threes": 3, "dunks": 2},
         {"name": "Pressure Package", "description": "Score 30+ PTS and attempt 8+ free throws.", "bonus": 2800, "type": "pts_fta", "pts": 30, "fta": 8},
+        {"name": "Rim and Range", "description": "Score 25+ PTS with 3+ threes and 3+ dunks.", "bonus": 3300, "type": "inside_out", "pts": 25, "threes": 3, "dunks": 3},
+        {"name": "Scoring Burst", "description": "Score 40+ PTS.", "bonus": 3600, "type": "points", "target": 40},
+        {"name": "Efficient Threat", "description": "Score 30+ PTS on 50%+ FG.", "bonus": 3300, "type": "pts_fg_pct", "pts": 30, "fg_pct": 0.50},
+        {"name": "Free Throw Pressure", "description": "Attempt 10+ free throws and score 25+ PTS.", "bonus": 3200, "type": "pts_fta", "pts": 25, "fta": 10},
+        {"name": "Modern Scorer", "description": "Make 5+ threes and 3+ dunks.", "bonus": 3400, "type": "threes_dunks", "threes": 5, "dunks": 3},
+        {"name": "Takeover Scorer", "description": "Score 35+ PTS and win.", "bonus": 3500, "type": "pts_win", "pts": 35},
     ],
 }
 
+
 def get_coach_challenge(archetype_key, games_played=0):
     import random
+
     pool = COACH_CHALLENGES.get(archetype_key, COACH_CHALLENGES["balanced_star"])
+
+    if not pool:
+        return None
+
     random.seed(f"{archetype_key}-{games_played}")
     return random.choice(pool)
 
@@ -199,42 +267,175 @@ def get_coach_challenge(archetype_key, games_played=0):
 def coach_challenge_completed(challenge, stats, pts, reb):
     ctype = challenge.get("type")
 
+    fgm = stats.get("fgm", 0)
+    fga = stats.get("fga", 0)
+    tpm = stats.get("tpm", 0)
+    tpa = stats.get("tpa", 0)
+    ast = stats.get("ast", 0)
+    stl = stats.get("stl", 0)
+    blk = stats.get("blk", 0)
+    dreb = stats.get("dreb", 0)
+    oreb = stats.get("oreb", 0)
+    dunks = stats.get("dunks", 0)
+    fta = stats.get("fta", 0)
+    to_val = stats.get("to_val", 0)
+    win = stats.get("win", False)
+
+    stocks = stl + blk
+    fg_pct = (fgm / fga) if fga > 0 else 0
+    three_pct = (tpm / tpa) if tpa > 0 else 0
+
     if ctype == "balanced":
-        return pts >= 20 and reb >= 5 and stats["ast"] >= 5
+        return pts >= 20 and reb >= 5 and ast >= 5
+
     if ctype == "win_pts":
-        return stats["win"] and pts >= 25
+        return win and pts >= 25
+
     if ctype == "threes":
-        return stats["tpm"] >= challenge["target"]
+        return tpm >= challenge["target"]
+
     if ctype == "pts_threes":
-        return pts >= challenge["pts"] and stats["tpm"] >= challenge["threes"]
+        return pts >= challenge["pts"] and tpm >= challenge["threes"]
+
     if ctype == "steals_win":
-        return stats["stl"] >= challenge["target"] and stats["win"]
+        return stl >= challenge["target"] and win
+
     if ctype == "stocks":
-        return (stats["stl"] + stats["blk"]) >= challenge["target"]
+        return stocks >= challenge["target"]
+
     if ctype == "ast_dunks":
-        return stats["ast"] >= challenge["ast"] and stats["dunks"] >= challenge["dunks"]
+        return ast >= challenge["ast"] and dunks >= challenge["dunks"]
+
     if ctype == "fta_win":
-        return stats["fta"] >= challenge["target"] and stats["win"]
+        return fta >= challenge["target"] and win
+
     if ctype == "pts_ast":
-        return pts >= challenge["pts"] and stats["ast"] >= challenge["ast"]
+        return pts >= challenge["pts"] and ast >= challenge["ast"]
+
     if ctype == "fgm_ast":
-        return stats["fgm"] >= challenge["fgm"] and stats["ast"] >= challenge["ast"]
+        return fgm >= challenge["fgm"] and ast >= challenge["ast"]
+
     if ctype == "pts_stocks":
-        return pts >= challenge["pts"] and (stats["stl"] + stats["blk"]) >= challenge["stocks"]
+        return pts >= challenge["pts"] and stocks >= challenge["stocks"]
+
     if ctype == "dunks":
-        return stats["dunks"] >= challenge["target"]
+        return dunks >= challenge["target"]
+
     if ctype == "blocks":
-        return stats["blk"] >= challenge["target"]
+        return blk >= challenge["target"]
+
     if ctype == "reb_blk":
-        return reb >= challenge["reb"] and stats["blk"] >= challenge["blk"]
+        return reb >= challenge["reb"] and blk >= challenge["blk"]
+
     if ctype == "rebounds":
         return reb >= challenge["target"]
+
     if ctype == "oreb":
-        return stats["oreb"] >= challenge["target"]
+        return oreb >= challenge["target"]
+
     if ctype == "inside_out":
-        return pts >= challenge["pts"] and stats["tpm"] >= challenge["threes"] and stats["dunks"] >= challenge["dunks"]
+        return pts >= challenge["pts"] and tpm >= challenge["threes"] and dunks >= challenge["dunks"]
+
     if ctype == "pts_fta":
-        return pts >= challenge["pts"] and stats["fta"] >= challenge["fta"]
+        return pts >= challenge["pts"] and fta >= challenge["fta"]
+
+    if ctype == "pts_reb_ast":
+        return pts >= challenge["pts"] and reb >= challenge["reb"] and ast >= challenge["ast"]
+
+    if ctype == "ast_win":
+        return ast >= challenge["ast"] and win
+
+    if ctype == "pts_fg_pct":
+        return pts >= challenge["pts"] and fg_pct >= challenge["fg_pct"]
+
+    if ctype == "triple_double":
+        categories_10_plus = 0
+        if pts >= 10:
+            categories_10_plus += 1
+        if reb >= 10:
+            categories_10_plus += 1
+        if ast >= 10:
+            categories_10_plus += 1
+        if stl >= 10:
+            categories_10_plus += 1
+        if blk >= 10:
+            categories_10_plus += 1
+        return categories_10_plus >= 3
+
+    if ctype == "pts_reb_ast_stocks":
+        return pts >= challenge["pts"] and reb >= challenge["reb"] and ast >= challenge["ast"] and stocks >= challenge["stocks"]
+
+    if ctype == "threes_pct":
+        return tpm >= challenge["threes"] and three_pct >= challenge["three_pct"]
+
+    if ctype == "threes_win":
+        return tpm >= challenge["threes"] and win
+
+    if ctype == "tpa_three_pct":
+        return tpa >= challenge["tpa"] and three_pct >= challenge["three_pct"]
+
+    if ctype == "threes_ast":
+        return tpm >= challenge["threes"] and ast >= challenge["ast"]
+
+    if ctype == "steals":
+        return stl >= challenge["target"]
+
+    if ctype == "pts_steals":
+        return pts >= challenge["pts"] and stl >= challenge["stl"]
+
+    if ctype == "stocks_win":
+        return stocks >= challenge["stocks"] and win
+
+    if ctype == "steals_dunks":
+        return stl >= challenge["stl"] and dunks >= challenge["dunks"]
+
+    if ctype == "stl_blk_win":
+        return stl >= challenge["stl"] and blk >= challenge["blk"] and win
+
+    if ctype == "pts_reb_stocks":
+        return pts >= challenge["pts"] and reb >= challenge["reb"] and stocks >= challenge["stocks"]
+
+    if ctype == "assists":
+        return ast >= challenge["target"]
+
+    if ctype == "pts_dunks":
+        return pts >= challenge["pts"] and dunks >= challenge["dunks"]
+
+    if ctype == "fta":
+        return fta >= challenge["target"]
+
+    if ctype == "dunks_win":
+        return dunks >= challenge["dunks"] and win
+
+    if ctype == "pts_ast_dunks":
+        return pts >= challenge["pts"] and ast >= challenge["ast"] and dunks >= challenge["dunks"]
+
+    if ctype == "ast_low_to":
+        return ast >= challenge["ast"] and to_val <= challenge["to_max"]
+
+    if ctype == "pts_reb_blk":
+        return pts >= challenge["pts"] and reb >= challenge["reb"] and blk >= challenge["blk"]
+
+    if ctype == "blk_dreb":
+        return blk >= challenge["blk"] and dreb >= challenge["dreb"]
+
+    if ctype == "reb_win":
+        return reb >= challenge["reb"] and win
+
+    if ctype == "pts_reb":
+        return pts >= challenge["pts"] and reb >= challenge["reb"]
+
+    if ctype == "oreb_win":
+        return oreb >= challenge["oreb"] and win
+
+    if ctype == "points":
+        return pts >= challenge["target"]
+
+    if ctype == "threes_dunks":
+        return tpm >= challenge["threes"] and dunks >= challenge["dunks"]
+
+    if ctype == "pts_win":
+        return pts >= challenge["pts"] and win
 
     return False
 

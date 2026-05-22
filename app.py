@@ -314,14 +314,14 @@ if st.session_state.page == "landing":
                 "Attributes will be randomized to match this overall while respecting the selected archetype."
             )
             create_archetype_key = archetype_options[selected_archetype_name]
-            next_challenge = db.get_coach_challenge(create_archetype_key, 0)
+            sample_challenge = db.get_coach_challenge(create_archetype_key, 0)
 
             st.markdown(f"""
                 <div style='background-color:#221a10; border:1px solid #ff7b00; border-radius:8px; padding:14px; margin-top:10px;'>
                     <div style='font-size:13px; color:#ffb066; text-transform:uppercase; font-weight:bold;'>Sample Coach's Challenge</div>
-                    <div style='font-size:22px; color:#ffffff; font-weight:bold; margin-top:4px;'>{next_challenge['name']}</div>
-                    <div style='font-size:14px; color:#dddddd; margin-top:4px;'>{next_challenge['description']}</div>
-                    <div style='font-size:14px; color:#00ff99; font-weight:bold; margin-top:8px;'>Reward: +{int(next_challenge['bonus']):,} XP before game multiplier</div>
+                    <div style='font-size:22px; color:#ffffff; font-weight:bold; margin-top:4px;'>{sample_challenge['name']}</div>
+                    <div style='font-size:14px; color:#dddddd; margin-top:4px;'>{sample_challenge['description']}</div>
+                    <div style='font-size:14px; color:#00ff99; font-weight:bold; margin-top:8px;'>Reward: +{int(sample_challenge['bonus']):,} XP before game multiplier</div>
                 </div>
             """, unsafe_allow_html=True)
             c1, c2, c3, c4, c5 = st.columns(5)
@@ -379,6 +379,37 @@ elif st.session_state.page == "overview":
     st.markdown("---")
     col_left, col_right = st.columns([1.2, 2.5])
 
+    # ---------------- COACH'S CHALLENGE / NEXT GAME OBJECTIVE ----------------
+
+    archetype_key = profile.get("archetype", "balanced_star")
+
+    games_played_total = len(
+        db.fetch_df(
+            "SELECT id FROM games WHERE player_id = ?",
+            (st.session_state.current_player_id,)
+        )
+    )
+
+    next_challenge = db.get_coach_challenge(archetype_key, games_played_total)
+
+    st.markdown(f"""
+        <div style='background-color:#221a10; border:1px solid #ff7b00; border-radius:8px; padding:14px; margin:12px 0 18px 0;'>
+            <div style='font-size:13px; color:#ffb066; text-transform:uppercase; font-weight:bold;'>
+                🎯 Coach's Challenge — Next Game Objective
+            </div>
+            <div style='font-size:22px; color:#ffffff; font-weight:bold; margin-top:4px;'>
+                {next_challenge['name']}
+            </div>
+            <div style='font-size:14px; color:#dddddd; margin-top:4px;'>
+                {next_challenge['description']}
+            </div>
+            <div style='font-size:14px; color:#00ff99; font-weight:bold; margin-top:8px;'>
+                Reward: +{int(next_challenge['bonus']):,} XP before game multiplier
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+
+
     with col_left:
         with st.form("game_submission", clear_on_submit=True):
             st.markdown("### ENTER GAME STATS")
@@ -432,9 +463,15 @@ elif st.session_state.page == "overview":
                     db.fetch_df("SELECT id FROM games WHERE player_id = ?", (st.session_state.current_player_id,))
                 )
 
-                coach_challenge = db.get_coach_challenge(archetype_key, games_played_before)
-                challenge_done = db.coach_challenge_completed(coach_challenge, stats, pts, reb)
-                challenge_bonus = int(coach_challenge["bonus"]) if challenge_done else 0
+                coach_challenge = next_challenge
+
+                challenge_done = db.coach_challenge_completed(
+                    coach_challenge,
+                    stats,
+                    pts,
+                    reb
+                )
+                challenge_bonus = coach_challenge["bonus"] if challenge_done else 0
 
                 xp_multiplier = GAME_TYPE_MULTIPLIERS[game_type]
                 final_xp = max(50, int((raw_xp + challenge_bonus) * xp_multiplier))
