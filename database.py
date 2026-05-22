@@ -5,7 +5,7 @@ import json
 
 DB_NAME = "nba2k_career.db"
 
-BASE_ENDORSEMENTS = [
+GLOBAL_ENDORSEMENTS = [
     ('Shoe Deal: The 40-Bomb', 'Score 40+ points in a single game.', 10000, 0),
     ('National TV: 50-Point Game', 'Score 50+ points in a single game.', 25000, 0),
     ('Energy Drink: Triple Double', 'Record double digits in 3 stat categories.', 15000, 0),
@@ -140,7 +140,7 @@ def get_archetype(archetype_key):
 
 
 def get_endorsements_for_archetype(archetype_key):
-    return BASE_ENDORSEMENTS + get_archetype(archetype_key).get("endorsements", [])
+    return GLOBAL_ENDORSEMENTS + get_archetype(archetype_key).get("endorsements", [])
 
 
 def get_attribute_discount(archetype_key, category, attribute_name):
@@ -149,6 +149,212 @@ def get_attribute_discount(archetype_key, category, attribute_name):
         return 0.8
     return 1.0
 
+
+COACH_CHALLENGES = {
+    "balanced_star": [
+        {"name": "All-Around Impact", "description": "Record 20+ PTS, 5+ REB, and 5+ AST.", "bonus": 2500, "type": "balanced"},
+        {"name": "Winning Basketball", "description": "Win the game and score 25+ PTS.", "bonus": 2200, "type": "win_pts"},
+    ],
+    "sharpshooter": [
+        {"name": "Green Light", "description": "Make 6+ threes.", "bonus": 2500, "type": "threes", "target": 6},
+        {"name": "Spacing Gravity", "description": "Score 30+ PTS with 4+ threes.", "bonus": 3000, "type": "pts_threes", "pts": 30, "threes": 4},
+    ],
+    "lockdown_defender": [
+        {"name": "Clamp Assignment", "description": "Record 3+ steals and hold a win.", "bonus": 2500, "type": "steals_win", "target": 3},
+        {"name": "Defensive Chaos", "description": "Record 5 combined steals + blocks.", "bonus": 2800, "type": "stocks", "target": 5},
+    ],
+    "slashing_playmaker": [
+        {"name": "Paint Touches", "description": "Get 10+ AST and 3+ dunks.", "bonus": 2800, "type": "ast_dunks", "ast": 10, "dunks": 3},
+        {"name": "Rim Pressure", "description": "Attempt 8+ free throws and win.", "bonus": 2600, "type": "fta_win", "target": 8},
+    ],
+    "playmaking_shot_creator": [
+        {"name": "Creator Night", "description": "Score 25+ PTS and get 10+ AST.", "bonus": 3000, "type": "pts_ast", "pts": 25, "ast": 10},
+        {"name": "Shot Clock Killer", "description": "Make 10+ field goals and get 8+ AST.", "bonus": 2800, "type": "fgm_ast", "fgm": 10, "ast": 8},
+    ],
+    "two_way_finisher": [
+        {"name": "Two-Way Pressure", "description": "Score 20+ PTS with 3+ stocks.", "bonus": 2700, "type": "pts_stocks", "pts": 20, "stocks": 3},
+        {"name": "Above The Rim", "description": "Record 5+ dunks.", "bonus": 2500, "type": "dunks", "target": 5},
+    ],
+    "rim_protector": [
+        {"name": "No Fly Zone", "description": "Record 4+ blocks.", "bonus": 2700, "type": "blocks", "target": 4},
+        {"name": "Paint Anchor", "description": "Record 12+ REB and 3+ BLK.", "bonus": 3000, "type": "reb_blk", "reb": 12, "blk": 3},
+    ],
+    "glass_cleaner": [
+        {"name": "Board Man", "description": "Grab 15+ rebounds.", "bonus": 2600, "type": "rebounds", "target": 15},
+        {"name": "Second Chances", "description": "Grab 5+ offensive rebounds.", "bonus": 2400, "type": "oreb", "target": 5},
+    ],
+    "inside_out_scorer": [
+        {"name": "Three-Level Scorer", "description": "Score 35+ PTS with 3+ threes and 2+ dunks.", "bonus": 3200, "type": "inside_out", "pts": 35, "threes": 3, "dunks": 2},
+        {"name": "Pressure Package", "description": "Score 30+ PTS and attempt 8+ free throws.", "bonus": 2800, "type": "pts_fta", "pts": 30, "fta": 8},
+    ],
+}
+
+def get_coach_challenge(archetype_key, games_played=0):
+    import random
+    pool = COACH_CHALLENGES.get(archetype_key, COACH_CHALLENGES["balanced_star"])
+    random.seed(f"{archetype_key}-{games_played}")
+    return random.choice(pool)
+
+
+def coach_challenge_completed(challenge, stats, pts, reb):
+    ctype = challenge.get("type")
+
+    if ctype == "balanced":
+        return pts >= 20 and reb >= 5 and stats["ast"] >= 5
+    if ctype == "win_pts":
+        return stats["win"] and pts >= 25
+    if ctype == "threes":
+        return stats["tpm"] >= challenge["target"]
+    if ctype == "pts_threes":
+        return pts >= challenge["pts"] and stats["tpm"] >= challenge["threes"]
+    if ctype == "steals_win":
+        return stats["stl"] >= challenge["target"] and stats["win"]
+    if ctype == "stocks":
+        return (stats["stl"] + stats["blk"]) >= challenge["target"]
+    if ctype == "ast_dunks":
+        return stats["ast"] >= challenge["ast"] and stats["dunks"] >= challenge["dunks"]
+    if ctype == "fta_win":
+        return stats["fta"] >= challenge["target"] and stats["win"]
+    if ctype == "pts_ast":
+        return pts >= challenge["pts"] and stats["ast"] >= challenge["ast"]
+    if ctype == "fgm_ast":
+        return stats["fgm"] >= challenge["fgm"] and stats["ast"] >= challenge["ast"]
+    if ctype == "pts_stocks":
+        return pts >= challenge["pts"] and (stats["stl"] + stats["blk"]) >= challenge["stocks"]
+    if ctype == "dunks":
+        return stats["dunks"] >= challenge["target"]
+    if ctype == "blocks":
+        return stats["blk"] >= challenge["target"]
+    if ctype == "reb_blk":
+        return reb >= challenge["reb"] and stats["blk"] >= challenge["blk"]
+    if ctype == "rebounds":
+        return reb >= challenge["target"]
+    if ctype == "oreb":
+        return stats["oreb"] >= challenge["target"]
+    if ctype == "inside_out":
+        return pts >= challenge["pts"] and stats["tpm"] >= challenge["threes"] and stats["dunks"] >= challenge["dunks"]
+    if ctype == "pts_fta":
+        return pts >= challenge["pts"] and stats["fta"] >= challenge["fta"]
+
+    return False
+
+def add_team_history(player_id, season_number, team_name, role, contract_years, salary):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO team_history (player_id, season_number, team_name, role, contract_years, salary)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (player_id, season_number, team_name, role, contract_years, salary))
+    conn.commit()
+    conn.close()
+
+
+def delete_team_history(history_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM team_history WHERE id = ?", (history_id,))
+    conn.commit()
+    conn.close()
+
+TENDENCY_CATEGORIES = {
+    "Jump Shooting": [
+        "Step Through Shot", "Shot Under Basket", "Shot Close", "Shot Close Left", "Shot Close Middle", "Shot Close Right",
+        "Shot Mid-Range", "Spot Up Shot Mid-Range", "Off Screen Shot Mid-Range", "Shot Mid Left", "Shot Mid Left-Center",
+        "Shot Mid Center", "Shot Mid Right-Center", "Shot Mid Right", "Shot Three", "Spot Up Shot Three",
+        "Off Screen Shot Three", "Shot Three Left", "Shot Three Left-Center", "Shot Three Center",
+        "Shot Three Right-Center", "Shot Three Right", "Contested Jumper Three", "Contested Jumper Mid-Range",
+        "Stepback Jumper Three", "Stepback Jumper Mid-Range", "Spin Jumper", "Transition Pull Up Three",
+        "Drive Pull Up Three", "Drive Pull Up Mid-Range", "Use Glass"
+    ],
+    "Layups and Dunks": [
+        "Driving Layup", "Standing Dunk", "Driving Dunk", "Flashy Dunk", "Alley-Oop", "Putback", "Crash",
+        "Spin Layup", "Hop Step Layup", "Euro Step Layup", "Floater"
+    ],
+    "Drive Setup": [
+        "Triple Threat Pump Fake", "Triple Threat Jab Step", "Triple Threat Idle", "Triple Threat Shoot",
+        "Setup with sizeup", "Setup with hesitation", "No setup dribble"
+    ],
+    "Driving": [
+        "Drive", "Spot Up Drive", "Off Screen Drive", "Drive Right", "Driving Crossover", "Driving Spin",
+        "Driving Step Back", "Driving Half Spin", "Driving Double Crossover", "Driving Behind the Back",
+        "Driving Dribble Hesitation", "Driving In and Out", "No Driving Dribble Moves", "Attack Strong on Drive"
+    ],
+    "Passing": ["Dish to Open Man", "Flashy Pass", "Alley-Oop Pass"],
+    "Post Game": [
+        "Post Up", "Post Shimmy Shot", "Post Face Up", "Post Back Down", "Post Aggressive Backdown",
+        "Shoot From Post", "Post Hook Left", "Post Hook Right", "Post Fade Left", "Post Fade Right",
+        "Post Up and Under", "Post Hop Shot", "Post Step Back Shot", "Post Drive", "Post Spin",
+        "Post Drop Step", "Post Hop Step"
+    ],
+    "Freelance": [
+        "Shot", "Touches", "Roll vs Pop", "Transition Spot Up", "Iso vs Elite Defender",
+        "Iso vs Good Defender", "Iso vs Average Defender", "Iso vs Poor Defender", "Play Discipline"
+    ],
+    "Defense": [
+        "Pass Interception", "Take Charge", "On-Ball Steal", "Contest Shot", "Block Shot", "Foul", "Hard Foul"
+    ],
+}
+
+def default_tendency_value(archetype_key, tendency_name):
+    name = tendency_name.lower()
+
+    if archetype_key == "sharpshooter":
+        if "three" in name or "jumper" in name or "spot up" in name:
+            return 80
+        if "dunk" in name or "post" in name:
+            return 35
+    elif archetype_key == "lockdown_defender":
+        if name in ["pass interception", "on-ball steal", "contest shot", "block shot", "take charge"]:
+            return 80
+        if "shot" in name and "contest" not in name:
+            return 45
+    elif archetype_key == "slashing_playmaker":
+        if "drive" in name or "layup" in name or "dunk" in name or "dish" in name:
+            return 75
+        if "three" in name:
+            return 45
+    elif archetype_key == "playmaking_shot_creator":
+        if "stepback" in name or "pull up" in name or "mid" in name or "dish" in name or "crossover" in name:
+            return 75
+    elif archetype_key == "two_way_finisher":
+        if "dunk" in name or "drive" in name or "layup" in name or "contest" in name or "steal" in name or "block" in name:
+            return 75
+    elif archetype_key == "rim_protector":
+        if "block" in name or "contest" in name or "post" in name or "standing dunk" in name:
+            return 80
+        if "three" in name:
+            return 20
+    elif archetype_key == "glass_cleaner":
+        if "putback" in name or "crash" in name or "standing dunk" in name or "post" in name:
+            return 75
+    elif archetype_key == "inside_out_scorer":
+        if "three" in name or "drive" in name or "dunk" in name or "layup" in name:
+            return 75
+
+    return 50
+
+
+def initialize_tendencies(player_id, archetype_key):
+    conn = get_connection()
+    cursor = conn.cursor()
+    rows = []
+    for category, tendencies in TENDENCY_CATEGORIES.items():
+        for tendency in tendencies:
+            rows.append((player_id, category, tendency, default_tendency_value(archetype_key, tendency)))
+    cursor.executemany("INSERT OR IGNORE INTO tendencies VALUES (?, ?, ?, ?)", rows)
+    conn.commit()
+    conn.close()
+
+
+def update_tendency(player_id, tendency_name, value):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE tendencies SET value = ? WHERE player_id = ? AND tendency_name = ?",
+        (int(value), player_id, tendency_name)
+    )
+    conn.commit()
+    conn.close()
 # ==========================================
 # 2K DYNAMIC OVR ENGINE MATRIX
 # ==========================================
@@ -248,17 +454,83 @@ def init_db():
     profile_columns = [row["name"] for row in cursor.fetchall()]
     if "archetype" not in profile_columns:
         cursor.execute("ALTER TABLE player_profile ADD COLUMN archetype TEXT DEFAULT 'balanced_star'")
+    # Existing-save migrations for games table
+    add_column_if_missing(cursor, "games", "opponent_team", "TEXT DEFAULT ''")
+    add_column_if_missing(cursor, "games", "your_team_score", "INTEGER DEFAULT 0")
+    add_column_if_missing(cursor, "games", "opponent_score", "INTEGER DEFAULT 0")
+    add_column_if_missing(cursor, "games", "home_away", "TEXT DEFAULT 'Home'")
+    add_column_if_missing(cursor, "games", "is_playoffs", "INTEGER DEFAULT 0")
+    add_column_if_missing(cursor, "games", "game_type", "TEXT DEFAULT 'Regular Season'")
+    add_column_if_missing(cursor, "games", "xp_multiplier", "REAL DEFAULT 1.0")
+    add_column_if_missing(cursor, "games", "coach_challenge_name", "TEXT DEFAULT ''")
+    add_column_if_missing(cursor, "games", "coach_challenge_completed", "INTEGER DEFAULT 0")
+    add_column_if_missing(cursor, "games", "coach_challenge_bonus", "INTEGER DEFAULT 0")
+
+    # Existing-save migrations for player profile / bio
+    add_column_if_missing(cursor, "player_profile", "height", "TEXT DEFAULT ''")
+    add_column_if_missing(cursor, "player_profile", "handedness", "TEXT DEFAULT 'Right'")
+    add_column_if_missing(cursor, "player_profile", "college_country", "TEXT DEFAULT ''")
+    add_column_if_missing(cursor, "player_profile", "draft_year", "INTEGER DEFAULT 0")
+    add_column_if_missing(cursor, "player_profile", "draft_pick", "TEXT DEFAULT ''")
+    add_column_if_missing(cursor, "player_profile", "current_team", "TEXT DEFAULT ''")
+    add_column_if_missing(cursor, "player_profile", "nickname", "TEXT DEFAULT ''")
+    add_column_if_missing(cursor, "player_profile", "age", "INTEGER DEFAULT 19")
+    add_column_if_missing(cursor, "player_profile", "personality_type", "TEXT DEFAULT 'Balanced'")
+
+
+    # Team history
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS team_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            player_id INTEGER,
+            season_number INTEGER,
+            team_name TEXT,
+            role TEXT,
+            contract_years INTEGER DEFAULT 1,
+            salary INTEGER DEFAULT 0
+        )
+    """)
+
+    # Milestones / records
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS milestones (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            player_id INTEGER,
+            milestone_name TEXT,
+            description TEXT,
+            game_id INTEGER,
+            season_number INTEGER,
+            unlocked_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(player_id, milestone_name)
+        )
+    """)
+
+    # Tendencies
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS tendencies (
+            player_id INTEGER,
+            category TEXT,
+            tendency_name TEXT,
+            value INTEGER DEFAULT 50,
+            PRIMARY KEY (player_id, tendency_name)
+        )
+    """)
 
     conn.commit()
     conn.close()
 
+def add_column_if_missing(cursor, table_name, column_name, column_definition):
+    cursor.execute(f"PRAGMA table_info({table_name})")
+    columns = [row["name"] for row in cursor.fetchall()]
+    if column_name not in columns:
+        cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_definition}")
 
-def create_player(name, position, jersey, weight, wingspan, archetype="balanced_star"):
+def create_player(name, position, jersey, weight, wingspan, archetype="balanced_star", height=""):
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
-        "INSERT INTO player_profile (name, position, jersey_number, weight, wingspan, total_xp, overall_rating, current_season, archetype) VALUES (?, ?, ?, ?, ?, 0, 60, 1, ?)",
-        (name, position, jersey, weight, wingspan, archetype))
+        "INSERT INTO player_profile (name, position, jersey_number, weight, wingspan, total_xp, overall_rating, current_season, archetype, height) VALUES (?, ?, ?, ?, ?, 0, 60, 1, ?)",
+        (name, position, jersey, weight, wingspan, archetype, height))
     player_id = cursor.lastrowid
 
     attrs = [
@@ -315,7 +587,18 @@ def create_player(name, position, jersey, weight, wingspan, archetype="balanced_
 
     endorsements = [(player_id, *endorsement) for endorsement in get_endorsements_for_archetype(archetype)]
     cursor.executemany("INSERT INTO endorsements VALUES (?, ?, ?, ?, ?)", endorsements)
+    tendency_rows = []
+    for category, tendencies in TENDENCY_CATEGORIES.items():
+        for tendency in tendencies:
+            tendency_rows.append(
+                (player_id, category, tendency, default_tendency_value(archetype, tendency))
+            )
 
+    cursor.executemany(
+        "INSERT OR IGNORE INTO tendencies VALUES (?, ?, ?, ?)",
+        tendency_rows
+    )
+    
     conn.commit()
     conn.close()
     return player_id
@@ -324,12 +607,19 @@ def create_player(name, position, jersey, weight, wingspan, archetype="balanced_
 def delete_player(player_id):
     conn = get_connection()
     cursor = conn.cursor()
+
     cursor.execute("DELETE FROM player_profile WHERE id = ?", (player_id,))
     cursor.execute("DELETE FROM player_attributes WHERE player_id = ?", (player_id,))
     cursor.execute("DELETE FROM badges WHERE player_id = ?", (player_id,))
     cursor.execute("DELETE FROM games WHERE player_id = ?", (player_id,))
     cursor.execute("DELETE FROM endorsements WHERE player_id = ?", (player_id,))
     cursor.execute("DELETE FROM season_records WHERE player_id = ?", (player_id,))
+
+    # New feature tables
+    cursor.execute("DELETE FROM team_history WHERE player_id = ?", (player_id,))
+    cursor.execute("DELETE FROM milestones WHERE player_id = ?", (player_id,))
+    cursor.execute("DELETE FROM tendencies WHERE player_id = ?", (player_id,))
+
     conn.commit()
     conn.close()
 
@@ -338,13 +628,39 @@ def set_player_archetype(player_id, archetype):
     conn = get_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute("UPDATE player_profile SET archetype = ? WHERE id = ?", (archetype, player_id))
+
+        cursor.execute(
+            "UPDATE player_profile SET archetype = ? WHERE id = ?",
+            (archetype, player_id)
+        )
+
         endorsements = [(player_id, *endorsement) for endorsement in get_endorsements_for_archetype(archetype)]
-        cursor.executemany("INSERT OR IGNORE INTO endorsements VALUES (?, ?, ?, ?, ?)", endorsements)
+        cursor.executemany(
+            "INSERT OR IGNORE INTO endorsements VALUES (?, ?, ?, ?, ?)",
+            endorsements
+        )
+
+        # Reset tendencies to match the new archetype
+        cursor.execute("DELETE FROM tendencies WHERE player_id = ?", (player_id,))
+
+        tendency_rows = []
+        for category, tendencies in TENDENCY_CATEGORIES.items():
+            for tendency in tendencies:
+                tendency_rows.append(
+                    (player_id, category, tendency, default_tendency_value(archetype, tendency))
+                )
+
+        cursor.executemany(
+            "INSERT OR IGNORE INTO tendencies VALUES (?, ?, ?, ?)",
+            tendency_rows
+        )
+
         conn.commit()
+
     except Exception as e:
         conn.rollback()
         raise e
+
     finally:
         conn.close()
 
@@ -356,9 +672,11 @@ def insert_game(player_id, season_number, stats, xp_earned):
     placeholders = ', '.join('?' * len(stats))
     query = f"INSERT INTO games (player_id, season_number, {cols}, xp_earned) VALUES (?, ?, {placeholders}, ?)"
     cursor.execute(query, (player_id, season_number, *stats.values(), xp_earned))
+    game_id = cursor.lastrowid
     cursor.execute("UPDATE player_profile SET total_xp = total_xp + ? WHERE id = ?", (xp_earned, player_id))
     conn.commit()
     conn.close()
+    return game_id
 
 
 def complete_endorsement(player_id, name, payout):
@@ -439,3 +757,36 @@ def process_season_end(player_id, current_season, stats_summary, awards_won, xp_
         raise e
     finally:
         conn.close()
+
+
+def unlock_milestone(player_id, milestone_name, description, game_id, season_number):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT OR IGNORE INTO milestones (player_id, milestone_name, description, game_id, season_number)
+        VALUES (?, ?, ?, ?, ?)
+    """, (player_id, milestone_name, description, game_id, season_number))
+    conn.commit()
+    conn.close()
+
+
+def check_game_milestones(player_id, game_id, season_number, stats, pts, reb):
+    milestones = []
+
+    if pts >= 30:
+        milestones.append(("First 30-Point Game", "Scored 30+ points in a game."))
+    if pts >= 50:
+        milestones.append(("First 50-Point Game", "Scored 50+ points in a game."))
+    if sum([pts >= 10, reb >= 10, stats["ast"] >= 10, stats["stl"] >= 10, stats["blk"] >= 10]) >= 3:
+        milestones.append(("First Triple-Double", "Recorded double digits in three stat categories."))
+    if stats["ast"] >= 10:
+        milestones.append(("First 10-Assist Game", "Recorded 10+ assists in a game."))
+    if pts >= 5 and reb >= 5 and stats["ast"] >= 5 and stats["stl"] >= 5 and stats["blk"] >= 5:
+        milestones.append(("First 5x5 Game", "Recorded at least 5 in points, rebounds, assists, steals, and blocks."))
+    if stats["tpm"] >= 10:
+        milestones.append(("First 10-Threes Game", "Made 10+ three-pointers in a game."))
+    if reb >= 20:
+        milestones.append(("First 20-Rebound Game", "Grabbed 20+ rebounds in a game."))
+
+    for name, desc in milestones:
+        unlock_milestone(player_id, name, desc, game_id, season_number)

@@ -231,8 +231,45 @@ def get_header(pending_cost=0, projected_ovr=None):
     return header_str, profile
 
 
+def validate_and_adjust_game_stats(stats):
+    warnings = []
+
+    if stats["tpm"] > stats["fgm"]:
+        warnings.append(f"You entered {stats['tpm']} made threes but only {stats['fgm']} field goals. FGM will be adjusted to {stats['tpm']}.")
+        stats["fgm"] = stats["tpm"]
+
+    if stats["fgm"] > stats["fga"]:
+        warnings.append(f"You entered {stats['fgm']} made field goals but only {stats['fga']} field goal attempts. FGA will be adjusted to {stats['fgm']}.")
+        stats["fga"] = stats["fgm"]
+
+    if stats["tpm"] > stats["tpa"]:
+        warnings.append(f"You entered {stats['tpm']} made threes but only {stats['tpa']} three-point attempts. 3PA will be adjusted to {stats['tpm']}.")
+        stats["tpa"] = stats["tpm"]
+
+    if stats["ftm"] > stats["fta"]:
+        warnings.append(f"You entered {stats['ftm']} made free throws but only {stats['fta']} free throw attempts. FTA will be adjusted to {stats['ftm']}.")
+        stats["fta"] = stats["ftm"]
+
+    pts = ((stats["fgm"] - stats["tpm"]) * 2) + (stats["tpm"] * 3) + stats["ftm"]
+
+    if stats["to_val"] >= 15:
+        warnings.append("Turnovers are extremely high. Double-check that this is intentional.")
+    if stats["fls"] >= 8:
+        warnings.append("Fouls are extremely high. Double-check that this is intentional.")
+    if pts > 150:
+        warnings.append(f"You entered a {pts}-point game. If this is intentional, submit again after reviewing the numbers.")
+
+    return stats, warnings
+
+
 show_pending_celebration()
 
+GAME_TYPE_MULTIPLIERS = {
+                    "Regular Season": 1.0,
+                    "Prime-Time/Rivalry": 1.2,
+                    "Playoffs": 1.5,
+                    "Elimination Game": 2.0,
+                }
 
 # ==========================================
 # PAGE 0: LANDING
@@ -273,17 +310,31 @@ if st.session_state.page == "landing":
             selected_archetype_name = st.selectbox("Archetype / Takeover", list(archetype_options.keys()))
             selected_archetype = db.get_archetype(archetype_options[selected_archetype_name])
             st.caption(f"{selected_archetype['takeover']} - {selected_archetype['description']} {selected_archetype['xp_bonus']}")
-            c1, c2, c3 = st.columns(3)
+            create_archetype_key = archetype_options[selected_archetype_name]
+            next_challenge = db.get_coach_challenge(create_archetype_key, 0)
+
+            st.markdown(f"""
+                <div style='background-color:#221a10; border:1px solid #ff7b00; border-radius:8px; padding:14px; margin-top:10px;'>
+                    <div style='font-size:13px; color:#ffb066; text-transform:uppercase; font-weight:bold;'>Sample Coach's Challenge</div>
+                    <div style='font-size:22px; color:#ffffff; font-weight:bold; margin-top:4px;'>{next_challenge['name']}</div>
+                    <div style='font-size:14px; color:#dddddd; margin-top:4px;'>{next_challenge['description']}</div>
+                    <div style='font-size:14px; color:#00ff99; font-weight:bold; margin-top:8px;'>Reward: +{int(next_challenge['bonus']):,} XP before game multiplier</div>
+                </div>
+            """, unsafe_allow_html=True)
+            c1, c2, c3, c4 = st.columns(4)
             with c1:
                 jersey = st.number_input("Jersey", 0, 99, 0)
             with c2:
-                weight = st.number_input("Weight (lbs)", 150, 400, 220)
+                height = st.text_input("Height", value="6'7\"", placeholder="6'7\"")
             with c3:
+                weight = st.number_input("Weight (lbs)", 150, 400, 220)
+            with c4:
                 wingspan = st.number_input("Wingspan (ft)", min_value=5.0, max_value=9.0, value=6.8, format="%.1f")
+
             if st.form_submit_button("CREATE CAREER"):
                 if name:
                     new_id = db.create_player(name, pos, jersey, weight, wingspan,
-                                              archetype_options[selected_archetype_name])
+                                              archetype_options[selected_archetype_name], height)
                     st.session_state.current_player_id = new_id
                     navigate("overview")
                     st.rerun()
@@ -326,6 +377,16 @@ elif st.session_state.page == "overview":
     with col_left:
         with st.form("game_submission", clear_on_submit=True):
             st.markdown("### ENTER GAME STATS")
+            st.markdown("#### Matchup Context")
+            m1, m2 = st.columns(2)
+            with m1:
+                opponent_team = st.text_input("Opponent Team", placeholder="Lakers")
+                home_away = st.selectbox("Home/Away", ["Home", "Away", "Neutral"])
+                game_type = st.selectbox("Game Type", list(GAME_TYPE_MULTIPLIERS.keys()))
+            with m2:
+                your_team_score = st.number_input("Your Team Score", 0, 250, 0)
+                opponent_score = st.number_input("Opponent Score", 0, 250, 0)
+                is_playoffs = st.checkbox("Playoff Game")
             c1, c2 = st.columns(2)
             stats = {}
             with c1:
@@ -347,18 +408,42 @@ elif st.session_state.page == "overview":
                 stats['blk'] = st.number_input("BLK", 0)
 
             if st.form_submit_button("SUBMIT GAME"):
-                stats['fgm'] = max(stats['fgm'], stats['tpm'])
-                stats['fga'] = max(stats['fga'], stats['fgm'])
-                stats['tpa'] = max(stats['tpa'], stats['tpm'])
+                stats, validation_warnings = validate_and_adjust_game_stats(stats)
+                for warning in validation_warnings:
+                    st.warning(warning)
                 pts = ((stats['fgm'] - stats['tpm']) * 2) + (stats['tpm'] * 3) + stats['ftm']
                 reb = stats['dreb'] + stats['oreb']
+                if your_team_score > 0 or opponent_score > 0:
+                    stats['win'] = your_team_score > opponent_score
 
                 base_salary = 300
                 win_bonus = 250 if stats['win'] else 0
                 positive_xp = (pts * 8) + (stats['ast'] * 20) + (reb * 12) + (stats['blk'] * 40) + (stats['stl'] * 40)
                 negative_xp = (stats['to_val'] * 20) + (stats['fls'] * 15) + ((stats['fga'] - stats['fgm']) * 5)
                 takeover_bonus = calculate_takeover_bonus(stats, pts, reb, archetype_key)
-                final_xp = max(50, int(base_salary + win_bonus + positive_xp + takeover_bonus - negative_xp))
+                raw_xp = max(50, int(base_salary + win_bonus + positive_xp + takeover_bonus - negative_xp))
+
+                games_played_before = len(
+                    db.fetch_df("SELECT id FROM games WHERE player_id = ?", (st.session_state.current_player_id,))
+                )
+
+                coach_challenge = db.get_coach_challenge(archetype_key, games_played_before)
+                challenge_done = db.coach_challenge_completed(coach_challenge, stats, pts, reb)
+                challenge_bonus = int(coach_challenge["bonus"]) if challenge_done else 0
+
+                xp_multiplier = GAME_TYPE_MULTIPLIERS[game_type]
+                final_xp = max(50, int((raw_xp + challenge_bonus) * xp_multiplier))
+
+                stats["opponent_team"] = opponent_team
+                stats["your_team_score"] = int(your_team_score)
+                stats["opponent_score"] = int(opponent_score)
+                stats["home_away"] = home_away
+                stats["is_playoffs"] = int(is_playoffs or game_type in ["Playoffs", "Elimination Game"])
+                stats["game_type"] = game_type
+                stats["xp_multiplier"] = float(xp_multiplier)
+                stats["coach_challenge_name"] = coach_challenge["name"]
+                stats["coach_challenge_completed"] = int(challenge_done)
+                stats["coach_challenge_bonus"] = challenge_bonus
 
                 uncompleted_df = db.fetch_df("SELECT * FROM endorsements WHERE player_id = ? AND completed = 0",
                                              (st.session_state.current_player_id,))
@@ -376,7 +461,8 @@ elif st.session_state.page == "overview":
                             db.complete_endorsement(st.session_state.current_player_id, name, payout)
                             unlocked_msgs.append(f"🏆 {name} (+{payout:,} XP)")
 
-                db.insert_game(st.session_state.current_player_id, curr_season, stats, final_xp)
+                new_game_id = db.insert_game(st.session_state.current_player_id, curr_season, stats, final_xp)
+                db.check_game_milestones(st.session_state.current_player_id, new_game_id, curr_season, stats, pts, reb)
                 if unlocked_msgs:
                     for msg in unlocked_msgs: st.toast(msg, icon="💰")
                     st.balloons()
@@ -435,10 +521,21 @@ elif st.session_state.page == "overview":
                 w_l = "W" if game['win'] else "L"
                 border_col = "#00ff00" if game['win'] else "#ff4b4b"
 
+                opponent = game.get("opponent_team", "") if hasattr(game, "get") else ""
+                opponent = opponent if opponent else "Opponent"
+                your_score = int(game.get("your_team_score", 0)) if "your_team_score" in game else 0
+                opp_score = int(game.get("opponent_score", 0)) if "opponent_score" in game else 0
+                score_text = f"{your_score}-{opp_score}" if your_score or opp_score else "Score N/A"
+                venue = game.get("home_away", "Home") if "home_away" in game else "Home"
+                game_type_label = game.get("game_type", "Regular Season") if "game_type" in game else "Regular Season"
+
                 st.markdown(f"""
-                    <div style='background-color: #222222; padding: 12px 15px; border-left: 5px solid {border_col}; border-radius: 4px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.2);'>
-                        <span style='font-weight: bold; font-size: 18px; color: {border_col}; width: 35px;'>{w_l}</span>
-                        <span style='color: #e0e0e0; font-size: 15px; flex-grow: 1; text-align: left;'>
+                    <div style='background-color: #222222; padding: 12px 15px; border-left: 5px solid {border_col}; border-radius: 4px; margin-bottom: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);'>
+                        <div style='display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;'>
+                            <span style='font-weight: bold; font-size: 18px; color: {border_col};'>{w_l} vs {opponent}, {score_text}</span>
+                            <span style='font-size:12px; color:#ffb066;'>{venue} • {game_type_label} • +{int(game['xp_earned']):,} XP</span>
+                        </div>
+                        <span style='color: #e0e0e0; font-size: 15px;'>
                             <b style='color:#ffffff;'>{int(game['pts'])}</b> PTS &nbsp;|&nbsp; 
                             <b style='color:#ffffff;'>{int(game['reb'])}</b> REB &nbsp;|&nbsp; 
                             <b style='color:#ffffff;'>{int(game['ast'])}</b> AST &nbsp;|&nbsp; 
@@ -451,7 +548,7 @@ elif st.session_state.page == "overview":
             st.info(f"No games played in Season {curr_season} yet.")
 
     st.markdown("---")
-    nav1, nav2, nav3, nav4, nav5 = st.columns(5)
+    nav1, nav2, nav3, nav4, nav5, nav6, nav7 = st.columns(7)
     with nav1:
         st.button("ATTRIBUTES ➔", on_click=navigate, args=("attributes",))
     with nav2:
@@ -462,6 +559,10 @@ elif st.session_state.page == "overview":
         st.button("ANALYTICS", on_click=navigate, args=("analytics",))
     with nav5:
         st.button("CAREER / SEASONS ➔", on_click=navigate, args=("career",))
+    with nav6:
+        st.button("PLAYER BIO ➔", on_click=navigate, args=("bio",))
+    with nav7:
+        st.button("TENDENCIES ➔", on_click=navigate, args=("tendencies",))
 
 # ==========================================
 # PAGE 2: ATTRIBUTES
@@ -541,6 +642,86 @@ elif st.session_state.page == "attributes":
         if st.button("❌ RESET CART", disabled=(pending_cost == 0), use_container_width=True):
             st.session_state.attr_cart = {}
             st.rerun()
+
+    st.markdown("---")
+    st.subheader("🧠 Build Planner")
+
+    with st.expander("Plan Cheapest Path to Target OVR", expanded=False):
+        target_ovr = st.number_input("Target OVR", min_value=current_ovr, max_value=99, value=min(99, current_ovr + 1))
+
+        position_weights = db.OVR_WEIGHTS.get(raw_profile["position"], {})
+        sorted_impact_attrs = sorted(
+            [(attr, weight) for attr, weight in position_weights.items()],
+            key=lambda item: item[1],
+            reverse=True
+        )
+
+        st.caption("Highest OVR-impact attributes for your position:")
+        st.write(", ".join([f"{attr} ({weight})" for attr, weight in sorted_impact_attrs[:8]]))
+
+        if st.button("CALCULATE CHEAPEST PATH", use_container_width=True):
+            planner_attrs = {row["attribute_name"]: int(row["current_level"]) for _, row in attr_df.iterrows()}
+            planner_steps = []
+            planner_cost = 0
+            planner_savings = 0
+
+            safety = 0
+            while db.calculate_ovr(raw_profile["position"], planner_attrs) < target_ovr and safety < 500:
+                safety += 1
+                best_option = None
+
+                for _, row in attr_df.iterrows():
+                    attr_name = row["attribute_name"]
+                    current_level = planner_attrs[attr_name]
+                    if current_level >= int(row["max_level"]):
+                        continue
+
+                    old_ovr = db.calculate_ovr(raw_profile["position"], planner_attrs)
+                    test_attrs = planner_attrs.copy()
+                    test_attrs[attr_name] += 1
+                    new_ovr = db.calculate_ovr(raw_profile["position"], test_attrs)
+
+                    discount = db.get_attribute_discount(archetype_key, row["category"], attr_name)
+                    discounted_cost = calculate_upgrade_cost(current_level, current_level + 1, row["cost_multiplier"] * discount)
+                    normal_cost = calculate_upgrade_cost(current_level, current_level + 1, row["cost_multiplier"])
+
+                    ovr_gain = max(0.01, new_ovr - old_ovr)
+                    efficiency = discounted_cost / ovr_gain
+
+                    option = {
+                        "attr": attr_name,
+                        "cost": discounted_cost,
+                        "normal_cost": normal_cost,
+                        "new_level": current_level + 1,
+                        "efficiency": efficiency,
+                    }
+
+                    if best_option is None or option["efficiency"] < best_option["efficiency"]:
+                        best_option = option
+
+                if best_option is None:
+                    break
+
+                planner_attrs[best_option["attr"]] = best_option["new_level"]
+                planner_steps.append(best_option)
+                planner_cost += best_option["cost"]
+                planner_savings += best_option["normal_cost"] - best_option["cost"]
+
+            final_planned_ovr = db.calculate_ovr(raw_profile["position"], planner_attrs)
+
+            if final_planned_ovr >= target_ovr:
+                st.success(f"Cheapest projected path to {target_ovr} OVR: {planner_cost:,} XP")
+                st.caption(f"Archetype discount savings: {int(planner_savings):,} XP")
+
+                grouped = {}
+                for step in planner_steps:
+                    grouped.setdefault(step["attr"], 0)
+                    grouped[step["attr"]] += 1
+
+                for attr, amount in grouped.items():
+                    st.write(f"+{amount} {attr}")
+            else:
+                st.warning("Could not find a path to that OVR with current caps.")
 
     st.markdown("---")
     cols = st.columns(len(categories))
@@ -676,6 +857,61 @@ elif st.session_state.page == "analytics":
         st.info("No games logged yet. Submit a game to unlock analytics.")
     else:
         st.subheader("Career Highs")
+        st.markdown("---")
+        st.subheader("Advanced Analytics")
+
+        total_pts = games_df["pts"].sum()
+        total_fgm = games_df["fgm_adj"].sum()
+        total_fga = games_df["fga_adj"].sum()
+        total_tpm = games_df["tpm"].sum()
+        total_tpa = games_df["tpa_adj"].sum()
+        total_ftm = games_df["ftm"].sum()
+        total_fta = games_df["fta"].sum()
+        total_ast = games_df["ast"].sum()
+        total_to = games_df["to_val"].sum()
+        total_xp = games_df["xp_earned"].sum()
+
+        fg_pct = (total_fgm / total_fga * 100) if total_fga else 0
+        tp_pct = (total_tpm / total_tpa * 100) if total_tpa else 0
+        ft_pct = (total_ftm / total_fta * 100) if total_fta else 0
+        ts_pct = (total_pts / (2 * (total_fga + 0.44 * total_fta)) * 100) if (total_fga + 0.44 * total_fta) else 0
+        points_per_shot = total_pts / total_fga if total_fga else 0
+        ast_to = total_ast / total_to if total_to else total_ast
+        win_pct = games_df["win"].mean() * 100
+        avg_xp = total_xp / len(games_df)
+
+        a1, a2, a3, a4, a5, a6 = st.columns(6)
+        a1.metric("FG%", f"{fg_pct:.1f}%")
+        a2.metric("3P%", f"{tp_pct:.1f}%")
+        a3.metric("FT%", f"{ft_pct:.1f}%")
+        a4.metric("TS%", f"{ts_pct:.1f}%")
+        a5.metric("PTS / Shot", f"{points_per_shot:.2f}")
+        a6.metric("AST/TO", f"{ast_to:.2f}")
+
+        b1, b2, b3, b4 = st.columns(4)
+        b1.metric("Win %", f"{win_pct:.1f}%")
+        b2.metric("Avg XP/Game", f"{avg_xp:,.0f}")
+        b3.metric("Career Games", len(games_df))
+        b4.metric("Career Points", int(total_pts))
+
+        st.markdown("### Form Indicators")
+        last5 = games_df.tail(5)
+        last10 = games_df.tail(10)
+
+        f1, f2 = st.columns(2)
+        with f1:
+            if not last5.empty:
+                st.success(
+                    f"Last 5: {last5['pts'].mean():.1f} PPG | {last5['ast'].mean():.1f} APG | "
+                    f"{(last5['fgm_adj'].sum() / last5['fga_adj'].sum() * 100) if last5['fga_adj'].sum() else 0:.1f} FG% | "
+                    f"{int(last5['win'].sum())}-{len(last5) - int(last5['win'].sum())} Record"
+                )
+        with f2:
+            if not last10.empty:
+                st.info(
+                    f"Last 10: {last10['pts'].mean():.1f} PPG | {last10['ast'].mean():.1f} APG | "
+                    f"{int(last10['win'].sum())}-{len(last10) - int(last10['win'].sum())} Record"
+                )
         high_cols = st.columns(6)
         highs = [
             ("PTS", "pts"),
@@ -760,10 +996,121 @@ elif st.session_state.page == "career":
     header_html, profile = get_header()
     # Explicitly cast to Python int to prevent numpy blob errors
     curr_season = int(profile['current_season'])
+    all_games_df = db.fetch_df(
+        "SELECT * FROM games WHERE player_id = ?",
+        (st.session_state.current_player_id,)
+    )
+    all_games_df = prepare_games_df(all_games_df)
+
+    all_seasons_df = db.fetch_df(
+        "SELECT awards_json FROM season_records WHERE player_id = ?",
+        (st.session_state.current_player_id,)
+    )
+
+    all_awards = []
+    if not all_seasons_df.empty:
+        for _, award_row in all_seasons_df.iterrows():
+            if award_row["awards_json"]:
+                all_awards.extend(json.loads(award_row["awards_json"]))
+
+    career_points = int(all_games_df["pts"].sum()) if not all_games_df.empty else 0
+    career_rebounds = int(all_games_df["reb"].sum()) if not all_games_df.empty else 0
+    career_assists = int(all_games_df["ast"].sum()) if not all_games_df.empty else 0
+
+    legacy_score = (
+        career_points
+        + career_rebounds * 1.2
+        + career_assists * 1.5
+        + all_awards.count("NBA Champion") * 10000
+        + all_awards.count("MVP") * 5000
+        + all_awards.count("Finals MVP") * 4000
+        + all_awards.count("DPOY") * 3000
+        + all_awards.count("All-NBA 1st Team") * 2000
+        + all_awards.count("All-Defensive Team") * 1500
+    )
+
+    if legacy_score < 5000:
+        legacy_rank = "G-League Prospect"
+        goat_target = 5000
+    elif legacy_score < 15000:
+        legacy_rank = "Rising Star"
+        goat_target = 15000
+    elif legacy_score < 35000:
+        legacy_rank = "All-Star"
+        goat_target = 35000
+    elif legacy_score < 75000:
+        legacy_rank = "Hall of Famer"
+        goat_target = 75000
+    else:
+        legacy_rank = "The GOAT"
+        goat_target = max(legacy_score, 100000)
+
+    progress_value = min(1.0, legacy_score / goat_target)
+
+    st.subheader("🐐 G.O.A.T. Meter")
+    st.markdown(f"**Legacy Rank:** {legacy_rank}  \n**Legacy Score:** {int(legacy_score):,}")
+    st.progress(progress_value)
+
+    st.subheader("🏆 Trophy Cabinet")
+    trophy_counts = {
+        "🏆": all_awards.count("NBA Champion"),
+        "🏅": all_awards.count("MVP"),
+        "💎": all_awards.count("Finals MVP"),
+        "🛡️": all_awards.count("DPOY"),
+        "⭐": all_awards.count("All-NBA 1st Team"),
+        "🔒": all_awards.count("All-Defensive Team"),
+        "🎯": all_awards.count("3PT Contest Winner"),
+        "🚀": all_awards.count("Dunk Contest Winner"),
+    }
+
+    cabinet_html = ""
+    for emoji, count in trophy_counts.items():
+        if count > 0:
+            cabinet_html += f"<span style='font-size:42px; margin-right:10px;' title='x{count}'>{emoji}</span><span style='color:#aaa; margin-right:18px;'>x{count}</span>"
+
+    if cabinet_html:
+        st.markdown(f"<div style='background:#222; padding:18px; border-radius:8px;'>{cabinet_html}</div>", unsafe_allow_html=True)
+    else:
+        st.info("No trophies yet. Build the legacy.")
 
     st.button("⬅ BACK TO SEASON", on_click=navigate, args=("overview",))
     st.markdown(f"<h1 style='color: #ff7b00; display: inline;'>CAREER & AWARDS</h1> <br> {header_html}",
                 unsafe_allow_html=True)
+
+    st.subheader("Team History Timeline")
+
+    with st.expander("➕ Add Team History Entry"):
+        with st.form("team_history_form"):
+            th_season = st.number_input("Season Number", 1, 50, curr_season)
+            th_team = st.text_input("Team Name")
+            th_role = st.text_input("Role / Story", placeholder="Drafted by Trail Blazers, Signed with Bulls, Won MVP with Bulls")
+            th_contract = st.number_input("Contract Years", 1, 10, 1)
+            th_salary = st.number_input("Salary", 0, 100000000, 0)
+
+            if st.form_submit_button("ADD TEAM HISTORY"):
+                if th_team:
+                    db.add_team_history(st.session_state.current_player_id, int(th_season), th_team, th_role, int(th_contract), int(th_salary))
+                    st.success("Team history added.")
+                    st.rerun()
+                else:
+                    st.error("Team name is required.")
+
+    team_df = db.fetch_df(
+        "SELECT * FROM team_history WHERE player_id = ? ORDER BY season_number ASC",
+        (st.session_state.current_player_id,)
+    )
+
+    if team_df.empty:
+        st.info("No team history yet.")
+    else:
+        for _, row in team_df.iterrows():
+            st.markdown(f"""
+                <div style='background:#222; border-left:4px solid #ff7b00; padding:12px; border-radius:6px; margin-bottom:8px;'>
+                    <b style='color:#ff7b00;'>Season {int(row['season_number'])}</b> — 
+                    <span style='color:#fff;'>{row['team_name']}</span>
+                    <div style='color:#aaa; font-size:13px;'>{row['role']} • {int(row['contract_years'])} yr(s) • ${int(row['salary']):,}</div>
+                </div>
+            """, unsafe_allow_html=True)
 
     st.subheader("Historical Seasons")
     seasons_df = db.fetch_df(
@@ -812,25 +1159,50 @@ elif st.session_state.page == "career":
             st.markdown(
                 "Select any awards you won this year. Be honest! These will be permanently etched into your legacy and pay out massive XP.")
             with st.form("end_season_form"):
-                a1, a2 = st.columns(2)
+                a1, a2, a3 = st.columns(3)
+
                 with a1:
                     aw_champ = st.checkbox("NBA Champion (50,000 XP)")
                     aw_fmvp = st.checkbox("Finals MVP (25,000 XP)")
                     aw_mvp = st.checkbox("League MVP (25,000 XP)")
+                    aw_mip = st.checkbox("Most Improved Player (12,000 XP)")
+
                 with a2:
                     aw_dpoy = st.checkbox("Defensive Player of the Year (15,000 XP)")
-                    aw_roy = st.checkbox("Rookie of the Year (15,000 XP)")
+                    aw_clutch = st.checkbox("Clutch Player of the Year (10,000 XP)")
+                    aw_sixth = st.checkbox("Sixth Man of the Year (10,000 XP)")
                     aw_allnba = st.checkbox("All-NBA First Team (10,000 XP)")
+                    aw_alldef = st.checkbox("All-Defensive Team (8,000 XP)")
+
+                with a3:
+                    if curr_season == 1:
+                        aw_roy = st.checkbox("Rookie of the Year (15,000 XP)")
+                        aw_allrookie = st.checkbox("All-Rookie Team (7,500 XP)")
+                    else:
+                        aw_roy = False
+                        aw_allrookie = False
+                        st.caption("Rookie awards are only available in Season 1.")
+
+                    aw_dunk = st.checkbox("Dunk Contest Winner (5,000 XP)")
+                    aw_threept = st.checkbox("3PT Contest Winner (5,000 XP)")
 
                 if st.form_submit_button("LOCK IN AWARDS & START NEW SEASON"):
                     aw_payout = 0
                     aw_list = []
+
                     if aw_champ: aw_payout += 50000; aw_list.append("NBA Champion")
                     if aw_fmvp: aw_payout += 25000; aw_list.append("Finals MVP")
                     if aw_mvp: aw_payout += 25000; aw_list.append("MVP")
+                    if aw_mip: aw_payout += 12000; aw_list.append("Most Improved Player")
                     if aw_dpoy: aw_payout += 15000; aw_list.append("DPOY")
-                    if aw_roy: aw_payout += 15000; aw_list.append("ROY")
+                    if aw_clutch: aw_payout += 10000; aw_list.append("Clutch Player of the Year")
+                    if aw_sixth: aw_payout += 10000; aw_list.append("Sixth Man of the Year")
                     if aw_allnba: aw_payout += 10000; aw_list.append("All-NBA 1st Team")
+                    if aw_alldef: aw_payout += 8000; aw_list.append("All-Defensive Team")
+                    if aw_roy: aw_payout += 15000; aw_list.append("ROY")
+                    if aw_allrookie: aw_payout += 7500; aw_list.append("All-Rookie Team")
+                    if aw_dunk: aw_payout += 5000; aw_list.append("Dunk Contest Winner")
+                    if aw_threept: aw_payout += 5000; aw_list.append("3PT Contest Winner")
 
                     games_df['fgm_adj'] = games_df[['fgm', 'tpm']].max(axis=1)
                     games_df['pts'] = ((games_df['fgm_adj'] - games_df['tpm']) * 2) + (games_df['tpm'] * 3) + games_df[
@@ -860,3 +1232,85 @@ elif st.session_state.page == "career":
                             st.toast(f"{endo['endorsement_name']} (+{payout:,} XP)", icon="🏆")
                     st.toast(f"Season {curr_season} completed! Earned {aw_payout:,} XP.", icon="🏆")
                     st.rerun()
+
+# ==========================================
+# PAGE 6: PLAYER BIO
+# ==========================================
+elif st.session_state.page == "bio":
+    header_html, profile = get_header()
+    st.button("⬅ BACK TO SEASON", on_click=navigate, args=("overview",))
+    st.markdown(f"<h1 style='color: #ff7b00; display: inline;'>PLAYER BIO / CAREER IDENTITY</h1> <br> {header_html}",
+                unsafe_allow_html=True)
+
+    with st.form("bio_form"):
+        c1, c2, c3 = st.columns(3)
+
+        with c1:
+            name = st.text_input("Name", value=str(profile.get("name", "")))
+            nickname = st.text_input("Nickname", value=str(profile.get("nickname", "") or ""))
+            age = st.number_input("Age", 16, 45, int(profile.get("age", 19) or 19))
+            height = st.text_input("Height", value=str(profile.get("height", "") or ""), placeholder="6'7\"")
+
+        with c2:
+            position = st.selectbox("Position", ["PG", "SG", "SF", "PF", "C"], index=["PG", "SG", "SF", "PF", "C"].index(profile["position"]))
+            jersey = st.number_input("Jersey Number", 0, 99, int(profile["jersey_number"]))
+            weight = st.number_input("Weight (lbs)", 150, 400, int(profile["weight"]))
+            wingspan = st.number_input("Wingspan (ft)", 5.0, 9.0, float(profile["wingspan"]), format="%.1f")
+
+        with c3:
+            handedness = st.selectbox("Handedness", ["Right", "Left"], index=0 if str(profile.get("handedness", "Right")) != "Left" else 1)
+            college_country = st.text_input("College/Country", value=str(profile.get("college_country", "") or ""))
+            draft_year = st.number_input("Draft Year", 0, 2100, int(profile.get("draft_year", 0) or 0))
+            draft_pick = st.text_input("Draft Pick", value=str(profile.get("draft_pick", "") or ""), placeholder="Round 1, Pick 7")
+            current_team = st.text_input("Current Team", value=str(profile.get("current_team", "") or ""))
+            personality_type = st.selectbox(
+                "Personality Type",
+                ["Balanced", "Alpha Scorer", "Team-First Leader", "Defensive Anchor", "Flashy Entertainer", "Quiet Superstar"],
+                index=0
+            )
+
+        if st.form_submit_button("SAVE BIO"):
+            conn = db.get_connection()
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE player_profile
+                SET name = ?, nickname = ?, age = ?, height = ?, position = ?, jersey_number = ?,
+                    weight = ?, wingspan = ?, handedness = ?, college_country = ?, draft_year = ?,
+                    draft_pick = ?, current_team = ?, personality_type = ?
+                WHERE id = ?
+            """, (
+                name, nickname, int(age), height, position, int(jersey), int(weight), float(wingspan),
+                handedness, college_country, int(draft_year), draft_pick, current_team, personality_type,
+                st.session_state.current_player_id
+            ))
+            conn.commit()
+            conn.close()
+            st.success("Player bio updated.")
+            st.rerun()
+
+# ==========================================
+# PAGE 7: TENDENCIES
+# ==========================================
+elif st.session_state.page == "tendencies":
+    header_html, profile = get_header()
+    st.button("⬅ BACK TO SEASON", on_click=navigate, args=("overview",))
+    st.markdown(f"<h1 style='color: #ff7b00; display: inline;'>TENDENCIES</h1> <br> {header_html}",
+                unsafe_allow_html=True)
+    st.caption("Attributes affect success. Tendencies affect how often your player attempts actions in simulation/AI contexts.")
+
+    tendencies_df = db.fetch_df(
+        "SELECT * FROM tendencies WHERE player_id = ? ORDER BY category, tendency_name",
+        (st.session_state.current_player_id,)
+    )
+
+    if tendencies_df.empty:
+        db.initialize_tendencies(st.session_state.current_player_id, get_archetype_key(profile))
+        st.rerun()
+
+    for category in tendencies_df["category"].unique():
+        with st.expander(category, expanded=(category in ["Jump Shooting", "Layups and Dunks", "Freelance"])):
+            cat_df = tendencies_df[tendencies_df["category"] == category]
+            for _, row in cat_df.iterrows():
+                new_val = st.slider(row["tendency_name"], 0, 100, int(row["value"]), key=f"tend_{row['tendency_name']}")
+                if new_val != int(row["value"]):
+                    db.update_tendency(st.session_state.current_player_id, row["tendency_name"], new_val)
