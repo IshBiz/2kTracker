@@ -3,6 +3,11 @@ import pandas as pd
 import database as db
 import json
 
+try:
+    import plotly.graph_objects as go
+except ImportError:
+    go = None
+
 st.set_page_config(page_title="2K Career Tracker", layout="wide", initial_sidebar_state="collapsed")
 db.init_db()
 
@@ -28,12 +33,186 @@ if 'page' not in st.session_state: st.session_state.page = "landing"
 if 'current_player_id' not in st.session_state: st.session_state.current_player_id = None
 if 'attr_cart' not in st.session_state: st.session_state.attr_cart = {}
 if 'badge_cart' not in st.session_state: st.session_state.badge_cart = {}
+if 'celebration' not in st.session_state: st.session_state.celebration = None
 
 
 def navigate(page_name):
     st.session_state.attr_cart = {}
     st.session_state.badge_cart = {}
     st.session_state.page = page_name
+
+
+def show_pending_celebration():
+    celebration = st.session_state.get("celebration")
+    if not celebration:
+        return
+
+    st.toast(celebration["message"], icon=celebration.get("icon", "🔥"))
+    if celebration.get("effect") == "snow":
+        st.snow()
+    else:
+        st.balloons()
+    st.session_state.celebration = None
+
+
+def get_archetype_key(profile):
+    return profile.get("archetype", "balanced_star") if hasattr(profile, "get") else "balanced_star"
+
+
+def calculate_takeover_bonus(stats, pts, reb, archetype_key):
+    if archetype_key == "sharpshooter":
+        return stats['tpm'] * 24
+    if archetype_key == "lockdown_defender":
+        return (stats['stl'] * 40) + (stats['blk'] * 40)
+    if archetype_key == "slashing_playmaker":
+        return (stats['ast'] * 20) + (stats['dunks'] * 30)
+    if archetype_key == "playmaking_shot_creator":
+        return (stats['ast'] * 20) + (stats['fgm'] * 8)
+    if archetype_key == "two_way_finisher":
+        return (stats['dunks'] * 35) + (stats['stl'] * 25) + (stats['blk'] * 25)
+    if archetype_key == "rim_protector":
+        return (stats['blk'] * 40) + (reb * 6)
+    if archetype_key == "glass_cleaner":
+        return reb * 12
+    if archetype_key == "inside_out_scorer":
+        return (stats['tpm'] * 16) + (stats['dunks'] * 25)
+    return 0
+
+
+def game_matches_endorsement(name, stats, pts, reb, games_played):
+    if name == 'Shoe Deal: The 40-Bomb':
+        return pts >= 40
+    if name == 'National TV: 50-Point Game':
+        return pts >= 50
+    if name == 'Energy Drink: Triple Double':
+        return sum([1 for x in [pts, reb, stats['ast'], stats['stl'], stats['blk']] if x >= 10]) >= 3
+    if name == 'Cereal Box: Rainmaker':
+        return stats['tpm'] >= 10
+    if name == 'Apparel Sponsor: Defensive Menace':
+        return stats['stl'] >= 5 and stats['blk'] >= 5
+    if name == 'State Farm: The Playmaker':
+        return stats['ast'] >= 20
+    if name == 'Gatorade: Board Man Gets Paid':
+        return reb >= 25
+    if name == 'Local Hero: 10 Games Played':
+        return games_played >= 10
+    if name == 'Foot Locker: Sniper Night':
+        return stats['tpm'] >= 12
+    if name == 'Splash Brothers Feature':
+        return pts >= 35 and stats['tpm'] >= 8
+    if name == 'Jordan Brand: Clamp Session':
+        return stats['stl'] >= 7
+    if name == 'NBA Cares: No Fly Zone':
+        return stats['blk'] >= 6
+    if name == 'Sprite: Highlight Factory':
+        return stats['dunks'] >= 5 and stats['ast'] >= 10
+    if name == 'And1: Rim Pressure':
+        return stats['fta'] >= 12
+    if name == 'Tissot: Shot Clock Killer':
+        return pts >= 30 and stats['ast'] >= 10
+    if name == 'Ankle Tape Sponsor':
+        return stats['ast'] >= 20
+    if name == 'Above The Rim Mixtape':
+        return stats['dunks'] >= 8
+    if name == 'Two-Way Takeover Feature':
+        return pts >= 25 and stats['stl'] >= 3 and stats['blk'] >= 3
+    if name == 'Block Party Broadcast':
+        return stats['blk'] >= 8
+    if name == 'Paint Patrol Sponsor':
+        return stats['blk'] >= 5 and stats['win']
+    if name == 'Board Man Elite':
+        return reb >= 30
+    if name == 'Second-Chance Sponsor':
+        return stats['oreb'] >= 10
+    if name == 'Three-Level Clinic':
+        return pts >= 40 and stats['tpm'] >= 4 and stats['dunks'] >= 3
+    if name == 'Offensive Threat Feature':
+        return pts >= 55
+    return False
+
+
+def season_award_endorsement_matches(name, awards_won):
+    award_set = set(awards_won)
+    award_triggers = {
+        'Three-Point Crown Campaign': 'MVP',
+        'Kia Defensive Legacy': 'DPOY',
+        'Anchor of the Year': 'DPOY',
+        'Floor General Spotlight': 'All-NBA 1st Team',
+        'All-NBA Two-Way Bonus': 'All-NBA 1st Team',
+        'Glass Work All-NBA Bonus': 'All-NBA 1st Team',
+        'MVP Campaign: Creator Edition': 'MVP',
+        'Scoring Champ MVP Push': 'MVP',
+    }
+    return award_triggers.get(name) in award_set
+
+
+def prepare_games_df(games_df):
+    if games_df.empty:
+        return games_df
+    games_df = games_df.copy()
+    games_df['fgm_adj'] = games_df[['fgm', 'tpm']].max(axis=1)
+    games_df['fga_adj'] = games_df[['fga', 'fgm_adj']].max(axis=1)
+    games_df['tpa_adj'] = games_df[['tpa', 'tpm']].max(axis=1)
+    games_df['pts'] = ((games_df['fgm_adj'] - games_df['tpm']) * 2) + (games_df['tpm'] * 3) + games_df['ftm']
+    games_df['reb'] = games_df['dreb'] + games_df['oreb']
+    games_df['game_no'] = games_df.groupby('season_number').cumcount() + 1
+    return games_df
+
+
+def get_build_radar_values(player_id):
+    attr_df = db.fetch_df("SELECT category, attribute_name, current_level FROM player_attributes WHERE player_id = ?",
+                          (player_id,))
+    groups = {
+        "Inside Scoring": ["Close Shot", "Driving Layup", "Standing Dunk", "Driving Dunk", "Post Hook",
+                           "Post Control", "Draw Foul"],
+        "Outside Scoring": ["Mid-Range Shot", "Three-Point Shot", "Free Throw", "Post Fade", "Shot IQ",
+                            "Offensive Consistency"],
+        "Playmaking": ["Ball Handle", "Pass IQ", "Pass Accuracy", "Pass Vision", "Hands", "Speed With Ball"],
+        "Defense": ["Interior Defense", "Perimeter Defense", "Block", "Steal", "Offensive Rebound",
+                    "Defensive Rebound", "Defensive Consistency", "Help Defense IQ", "Pass Perception"],
+        "Athleticism": ["Speed", "Vertical", "Strength", "Stamina", "Hustle", "Agility"],
+    }
+    values = {}
+    for label, attrs in groups.items():
+        subset = attr_df[attr_df['attribute_name'].isin(attrs)]
+        values[label] = float(subset['current_level'].mean()) if not subset.empty else 0.0
+    return values
+
+
+def render_build_radar(player_id):
+    radar_values = get_build_radar_values(player_id)
+    labels = list(radar_values.keys())
+    values = list(radar_values.values())
+
+    if go:
+        fig = go.Figure()
+        fig.add_trace(go.Scatterpolar(
+            r=values + [values[0]],
+            theta=labels + [labels[0]],
+            fill='toself',
+            line=dict(color='#ff7b00', width=3),
+            fillcolor='rgba(255, 123, 0, 0.28)',
+            name='Build'
+        ))
+        fig.update_layout(
+            template=None,
+            paper_bgcolor='#1a1a1a',
+            plot_bgcolor='#1a1a1a',
+            font=dict(color='#e0e0e0'),
+            margin=dict(l=30, r=30, t=20, b=20),
+            polar=dict(
+                bgcolor='#1a1a1a',
+                radialaxis=dict(visible=True, range=[0, 99], gridcolor='#333333', tickfont=dict(color='#888888')),
+                angularaxis=dict(gridcolor='#333333')
+            ),
+            showlegend=False,
+            height=360,
+        )
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.warning("Plotly is not installed, so the radar chart is shown as fallback bars.")
+        for label, value in radar_values.items():
+            st.progress(value / 99, text=f"{label}: {value:.1f}")
 
 
 def get_header(pending_cost=0, projected_ovr=None):
@@ -47,8 +226,12 @@ def get_header(pending_cost=0, projected_ovr=None):
 
     ovr = projected_ovr if projected_ovr else int(profile['overall_rating'])
     ovr_display = f"<span class='orange-text'>{ovr} OVR</span>"
-    header_str = f"<strong>{profile['name']}</strong> | {profile['position']} | #{profile['jersey_number']} | {ovr_display} | Season {int(profile['current_season'])} {xp_display}"
+    archetype = db.get_archetype(get_archetype_key(profile))
+    header_str = f"<strong>{profile['name']}</strong> | {profile['position']} | #{profile['jersey_number']} | {ovr_display} | {archetype['name']} | Season {int(profile['current_season'])} {xp_display}"
     return header_str, profile
+
+
+show_pending_celebration()
 
 
 # ==========================================
@@ -86,6 +269,10 @@ if st.session_state.page == "landing":
         with st.form("create_player_form", clear_on_submit=True):
             name = st.text_input("Player Name")
             pos = st.selectbox("Position", ["PG", "SG", "SF", "PF", "C"])
+            archetype_options = {info["name"]: key for key, info in db.ARCHETYPES.items()}
+            selected_archetype_name = st.selectbox("Archetype / Takeover", list(archetype_options.keys()))
+            selected_archetype = db.get_archetype(archetype_options[selected_archetype_name])
+            st.caption(f"{selected_archetype['takeover']} - {selected_archetype['description']} {selected_archetype['xp_bonus']}")
             c1, c2, c3 = st.columns(3)
             with c1:
                 jersey = st.number_input("Jersey", 0, 99, 0)
@@ -95,7 +282,8 @@ if st.session_state.page == "landing":
                 wingspan = st.number_input("Wingspan (ft)", min_value=5.0, max_value=9.0, value=6.8, format="%.1f")
             if st.form_submit_button("CREATE CAREER"):
                 if name:
-                    new_id = db.create_player(name, pos, jersey, weight, wingspan)
+                    new_id = db.create_player(name, pos, jersey, weight, wingspan,
+                                              archetype_options[selected_archetype_name])
                     st.session_state.current_player_id = new_id
                     navigate("overview")
                     st.rerun()
@@ -109,6 +297,8 @@ elif st.session_state.page == "overview":
     header_html, profile = get_header()
     # Explicitly cast to Python int to prevent numpy blob errors
     curr_season = int(profile['current_season'])
+    archetype_key = get_archetype_key(profile)
+    archetype = db.get_archetype(archetype_key)
 
     if st.button("⬅ CHANGE PLAYER / MAIN MENU"):
         st.session_state.current_player_id = None
@@ -116,6 +306,20 @@ elif st.session_state.page == "overview":
         st.rerun()
 
     st.markdown(header_html, unsafe_allow_html=True)
+    st.caption(f"{archetype['takeover']} - {archetype['xp_bonus']}")
+    if archetype_key == "balanced_star":
+        with st.expander("Set Archetype For This Save"):
+            st.caption("Older saves default to Balanced Star. Pick one archetype to unlock its bonuses and endorsements.")
+            migrated_options = {info["name"]: key for key, info in db.ARCHETYPES.items() if key != "balanced_star"}
+            migrated_choice = st.selectbox("Choose Archetype", list(migrated_options.keys()))
+            if st.button("LOCK ARCHETYPE", use_container_width=True):
+                db.set_player_archetype(st.session_state.current_player_id, migrated_options[migrated_choice])
+                st.session_state.celebration = {
+                    "message": f"{migrated_choice} takeover activated!",
+                    "effect": "balloons",
+                    "icon": "🔥"
+                }
+                st.rerun()
     st.markdown("---")
     col_left, col_right = st.columns([1.2, 2.5])
 
@@ -153,7 +357,8 @@ elif st.session_state.page == "overview":
                 win_bonus = 250 if stats['win'] else 0
                 positive_xp = (pts * 8) + (stats['ast'] * 20) + (reb * 12) + (stats['blk'] * 40) + (stats['stl'] * 40)
                 negative_xp = (stats['to_val'] * 20) + (stats['fls'] * 15) + ((stats['fga'] - stats['fgm']) * 5)
-                final_xp = max(50, int(base_salary + win_bonus + positive_xp - negative_xp))
+                takeover_bonus = calculate_takeover_bonus(stats, pts, reb, archetype_key)
+                final_xp = max(50, int(base_salary + win_bonus + positive_xp + takeover_bonus - negative_xp))
 
                 uncompleted_df = db.fetch_df("SELECT * FROM endorsements WHERE player_id = ? AND completed = 0",
                                              (st.session_state.current_player_id,))
@@ -165,24 +370,7 @@ elif st.session_state.page == "overview":
                     for _, endo in uncompleted_df.iterrows():
                         name = endo['endorsement_name']
                         payout = int(endo['payout'])
-                        unlocked = False
-                        if name == 'Shoe Deal: The 40-Bomb' and pts >= 40:
-                            unlocked = True
-                        elif name == 'National TV: 50-Point Game' and pts >= 50:
-                            unlocked = True
-                        elif name == 'Energy Drink: Triple Double':
-                            doubles = sum([1 for x in [pts, reb, stats['ast'], stats['stl'], stats['blk']] if x >= 10])
-                            if doubles >= 3: unlocked = True
-                        elif name == 'Cereal Box: Rainmaker' and stats['tpm'] >= 10:
-                            unlocked = True
-                        elif name == 'Apparel Sponsor: Defensive Menace' and stats['stl'] >= 5 and stats['blk'] >= 5:
-                            unlocked = True
-                        elif name == 'State Farm: The Playmaker' and stats['ast'] >= 20:
-                            unlocked = True
-                        elif name == 'Gatorade: Board Man Gets Paid' and reb >= 25:
-                            unlocked = True
-                        elif name == 'Local Hero: 10 Games Played' and games_played >= 10:
-                            unlocked = True
+                        unlocked = game_matches_endorsement(name, stats, pts, reb, games_played)
 
                         if unlocked:
                             db.complete_endorsement(st.session_state.current_player_id, name, payout)
@@ -192,20 +380,17 @@ elif st.session_state.page == "overview":
                 if unlocked_msgs:
                     for msg in unlocked_msgs: st.toast(msg, icon="💰")
                     st.balloons()
+                if takeover_bonus > 0:
+                    st.toast(f"{archetype['name']} Takeover Bonus: +{takeover_bonus:,} XP", icon="🔥")
                 st.rerun()
 
     with col_right:
         st.markdown(f"<h1>SEASON {curr_season} OVERVIEW</h1>", unsafe_allow_html=True)
         games_df = db.fetch_df("SELECT * FROM games WHERE player_id = ? AND season_number = ?",
                                (st.session_state.current_player_id, curr_season))
+        games_df = prepare_games_df(games_df)
 
         if not games_df.empty:
-            games_df['fgm_adj'] = games_df[['fgm', 'tpm']].max(axis=1)
-            games_df['fga_adj'] = games_df[['fga', 'fgm_adj']].max(axis=1)
-            games_df['tpa_adj'] = games_df[['tpa', 'tpm']].max(axis=1)
-            games_df['pts'] = ((games_df['fgm_adj'] - games_df['tpm']) * 2) + (games_df['tpm'] * 3) + games_df['ftm']
-            games_df['reb'] = games_df['dreb'] + games_df['oreb']
-
             wins = int(games_df['win'].sum())
             losses = len(games_df) - wins
             total_fgm = games_df['fgm_adj'].sum()
@@ -239,6 +424,10 @@ elif st.session_state.page == "overview":
                         unsafe_allow_html=True)
 
             st.markdown("---")
+            st.markdown("### BUILD RADAR")
+            render_build_radar(st.session_state.current_player_id)
+
+            st.markdown("---")
             st.markdown("### RECENT GAMES")
 
             recent_games = games_df.tail(5).iloc[::-1]
@@ -262,7 +451,7 @@ elif st.session_state.page == "overview":
             st.info(f"No games played in Season {curr_season} yet.")
 
     st.markdown("---")
-    nav1, nav2, nav3, nav4 = st.columns(4)
+    nav1, nav2, nav3, nav4, nav5 = st.columns(5)
     with nav1:
         st.button("ATTRIBUTES ➔", on_click=navigate, args=("attributes",))
     with nav2:
@@ -270,6 +459,8 @@ elif st.session_state.page == "overview":
     with nav3:
         st.button("ENDORSEMENTS ➔", on_click=navigate, args=("endorsements",))
     with nav4:
+        st.button("ANALYTICS", on_click=navigate, args=("analytics",))
+    with nav5:
         st.button("CAREER / SEASONS ➔", on_click=navigate, args=("career",))
 
 # ==========================================
@@ -278,6 +469,9 @@ elif st.session_state.page == "overview":
 elif st.session_state.page == "attributes":
     attr_df = db.fetch_df("SELECT * FROM player_attributes WHERE player_id = ?", (st.session_state.current_player_id,))
     categories = attr_df['category'].unique()
+    raw_profile = db.fetch_df("SELECT position, overall_rating, archetype FROM player_profile WHERE id = ?",
+                              (st.session_state.current_player_id,)).iloc[0]
+    archetype_key = get_archetype_key(raw_profile)
 
 
     def calculate_upgrade_cost(start_lvl, target_lvl, multiplier):
@@ -299,15 +493,14 @@ elif st.session_state.page == "attributes":
         curr_lvl = int(row['current_level'])
         if attr_name in st.session_state.attr_cart:
             target_lvl = st.session_state.attr_cart[attr_name]
-            cost = calculate_upgrade_cost(curr_lvl, target_lvl, row['cost_multiplier'])
+            discount = db.get_attribute_discount(archetype_key, row['category'], attr_name)
+            cost = calculate_upgrade_cost(curr_lvl, target_lvl, row['cost_multiplier'] * discount)
             pending_cost += cost
             upgrades_to_commit[attr_name] = target_lvl
             simulated_attrs[attr_name] = target_lvl
         else:
             simulated_attrs[attr_name] = curr_lvl
 
-    raw_profile = db.fetch_df("SELECT position, overall_rating FROM player_profile WHERE id = ?",
-                              (st.session_state.current_player_id,)).iloc[0]
     current_ovr = int(raw_profile['overall_rating'])
     projected_ovr = db.calculate_ovr(raw_profile['position'], simulated_attrs)
 
@@ -329,7 +522,20 @@ elif st.session_state.page == "attributes":
                                                projected_ovr)
             st.session_state.attr_cart = {}
             st.toast("Attributes upgraded successfully!", icon="🔥")
-            if projected_ovr > current_ovr: st.balloons()
+            crossed_thresholds = [threshold for threshold in [80, 90, 99] if current_ovr < threshold <= projected_ovr]
+            if crossed_thresholds:
+                threshold = crossed_thresholds[-1]
+                st.session_state.celebration = {
+                    "message": f"Major OVR milestone reached: {threshold} OVR!",
+                    "effect": "snow" if threshold == 99 else "balloons",
+                    "icon": "🔥"
+                }
+            elif projected_ovr > current_ovr:
+                st.session_state.celebration = {
+                    "message": f"OVR increased to {projected_ovr}!",
+                    "effect": "balloons",
+                    "icon": "🔥"
+                }
             st.rerun()
     with c2:
         if st.button("❌ RESET CART", disabled=(pending_cost == 0), use_container_width=True):
@@ -352,10 +558,13 @@ elif st.session_state.page == "attributes":
                     st.button(f"⭐ {attr_name} (MAX)", key=f"max_attr_{attr_name}", disabled=True,
                               use_container_width=True)
                 else:
-                    next_click_cost = calculate_upgrade_cost(virtual_lvl, virtual_lvl + 1, row['cost_multiplier'])
+                    discount = db.get_attribute_discount(archetype_key, row['category'], attr_name)
+                    next_click_cost = calculate_upgrade_cost(virtual_lvl, virtual_lvl + 1,
+                                                             row['cost_multiplier'] * discount)
                     can_afford = remaining_xp >= next_click_cost
+                    discount_tag = " (20% off)" if discount < 1 else ""
                     prefix = "🛒" if virtual_lvl > curr_lvl else "➕"
-                    if st.button(f"{prefix} {attr_name}: {virtual_lvl}  •  {next_click_cost} XP",
+                    if st.button(f"{prefix} {attr_name}: {virtual_lvl}  •  {next_click_cost} XP{discount_tag}",
                                  key=f"up_attr_{attr_name}", disabled=not can_afford, use_container_width=True):
                         st.session_state.attr_cart[attr_name] = virtual_lvl + 1
                         st.rerun()
@@ -396,9 +605,19 @@ elif st.session_state.page == "badges":
     c1, c2, c3 = st.columns([1, 1, 3])
     with c1:
         if st.button("✅ CONFIRM & PAY", disabled=(pending_cost == 0 or remaining_xp < 0), use_container_width=True):
+            legend_unlocks = [
+                badge_name for badge_name, target_lvl in upgrades_to_commit.items()
+                if target_lvl >= 5 and int(badges_df[badges_df['badge_name'] == badge_name].iloc[0]['level']) < 5
+            ]
             db.commit_batch_badge_upgrades(st.session_state.current_player_id, upgrades_to_commit, pending_cost)
             st.session_state.badge_cart = {}
             st.toast("Badges upgraded successfully!", icon="🔥")
+            if legend_unlocks:
+                st.session_state.celebration = {
+                    "message": f"Legend badge unlocked: {legend_unlocks[0]}!",
+                    "effect": "snow",
+                    "icon": "🔥"
+                }
             st.rerun()
     with c2:
         if st.button("❌ RESET CART", disabled=(pending_cost == 0), use_container_width=True):
@@ -439,7 +658,73 @@ elif st.session_state.page == "badges":
                 st.markdown("<div style='margin-bottom: 15px;'></div>", unsafe_allow_html=True)
 
 # ==========================================
-# PAGE 4: ENDORSEMENTS
+# PAGE 4: BOX SCORE & ANALYTICS
+# ==========================================
+elif st.session_state.page == "analytics":
+    header_html, profile = get_header()
+    curr_season = int(profile['current_season'])
+
+    st.button("â¬… BACK TO SEASON", on_click=navigate, args=("overview",))
+    st.markdown(f"<h1 style='color: #ff7b00; display: inline;'>BOX SCORE & ANALYTICS</h1> <br> {header_html}",
+                unsafe_allow_html=True)
+
+    games_df = db.fetch_df("SELECT * FROM games WHERE player_id = ? ORDER BY season_number ASC, id ASC",
+                           (st.session_state.current_player_id,))
+    games_df = prepare_games_df(games_df)
+
+    if games_df.empty:
+        st.info("No games logged yet. Submit a game to unlock analytics.")
+    else:
+        st.subheader("Career Highs")
+        high_cols = st.columns(6)
+        highs = [
+            ("PTS", "pts"),
+            ("REB", "reb"),
+            ("AST", "ast"),
+            ("STL", "stl"),
+            ("BLK", "blk"),
+            ("3PM", "tpm"),
+        ]
+        for col, (label, field) in zip(high_cols, highs):
+            best_row = games_df.loc[games_df[field].idxmax()]
+            col.markdown(
+                f"<div class='metric-label'>{label}</div><div class='metric-value'>{int(best_row[field])}</div><div style='font-size: 12px; color: #888;'>Season {int(best_row['season_number'])}</div>",
+                unsafe_allow_html=True)
+
+        st.markdown("---")
+        st.subheader(f"Season {curr_season} Progression")
+        season_games = games_df[games_df['season_number'] == curr_season].copy()
+        if season_games.empty:
+            st.info("No games logged in the current season yet.")
+        else:
+            chart_df = season_games[['game_no', 'pts', 'reb', 'ast', 'stl', 'blk']].set_index('game_no')
+            st.line_chart(chart_df)
+
+        st.markdown("---")
+        st.subheader("Full Game Log")
+        log_df = games_df.copy()
+        log_df['W/L'] = log_df['win'].apply(lambda value: "W" if value else "L")
+        display_df = log_df[['season_number', 'game_no', 'W/L', 'pts', 'reb', 'ast', 'stl', 'blk', 'tpm',
+                             'fga_adj', 'xp_earned']].rename(columns={
+            'season_number': 'Season',
+            'game_no': 'Game',
+            'pts': 'PTS',
+            'reb': 'REB',
+            'ast': 'AST',
+            'stl': 'STL',
+            'blk': 'BLK',
+            'tpm': '3PM',
+            'fga_adj': 'FGA',
+            'xp_earned': 'XP'
+        })
+        page_size = 10
+        total_pages = max(1, (len(display_df) + page_size - 1) // page_size)
+        page_num = st.number_input("Page", min_value=1, max_value=total_pages, value=1, step=1)
+        start = (int(page_num) - 1) * page_size
+        st.dataframe(display_df.iloc[start:start + page_size], use_container_width=True, hide_index=True)
+
+# ==========================================
+# PAGE 5: ENDORSEMENTS
 # ==========================================
 elif st.session_state.page == "endorsements":
     header_html, profile = get_header()
@@ -490,29 +775,27 @@ elif st.session_state.page == "career":
             awards_list = json.loads(row['awards_json']) if row['awards_json'] and row['awards_json'] != "[]" else []
             awards_str = " &nbsp;|&nbsp; ".join([f"🏆 {a}" for a in awards_list]) if awards_list else "No Major Awards"
 
-            st.markdown(f"""
-                <div style='background-color: #1e1e1e; border: 1px solid #333333; border-radius: 6px; padding: 15px; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);'>
-                    <div style='display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 15px;'>
-                        <span style='font-size: 20px; font-weight: bold; color: #ff7b00;'>SEASON {int(row['season_number'])}</span>
-                        <span style='font-size: 16px; color: #aaaaaa; padding-top: 3px;'>
-                            {int(row['games_played'])} GP &nbsp;|&nbsp; 
-                            <span style='color:#00ff00; font-weight: bold;'>{int(row['wins'])}W</span> - <span style='color:#ff4b4b; font-weight: bold;'>{int(row['losses'])}L</span>
-                        </span>
-                    </div>
-
-                    <div style='display: flex; justify-content: space-around; margin-bottom: 15px;'>
-                        <div style='text-align: center;'><div style='font-size: 12px; color: #888888; text-transform: uppercase;'>PPG</div><div style='font-size: 24px; font-weight: bold; color: #ffffff;'>{float(row['ppg']):.1f}</div></div>
-                        <div style='text-align: center;'><div style='font-size: 12px; color: #888888; text-transform: uppercase;'>RPG</div><div style='font-size: 24px; font-weight: bold; color: #ffffff;'>{float(row['rpg']):.1f}</div></div>
-                        <div style='text-align: center;'><div style='font-size: 12px; color: #888888; text-transform: uppercase;'>APG</div><div style='font-size: 24px; font-weight: bold; color: #ffffff;'>{float(row['apg']):.1f}</div></div>
-                        <div style='text-align: center;'><div style='font-size: 12px; color: #888888; text-transform: uppercase;'>SPG</div><div style='font-size: 24px; font-weight: bold; color: #ffffff;'>{float(row['spg']):.1f}</div></div>
-                        <div style='text-align: center;'><div style='font-size: 12px; color: #888888; text-transform: uppercase;'>BPG</div><div style='font-size: 24px; font-weight: bold; color: #ffffff;'>{float(row['bpg']):.1f}</div></div>
-                    </div>
-
-                    <div style='font-size: 14px; color: #ffd700; font-weight: bold; background-color: #2a2a2a; padding: 10px; border-radius: 4px; text-align: center;'>
-                        {awards_str}
-                    </div>
-                </div>
-            """, unsafe_allow_html=True)
+            stat_html = "".join([
+                f"<div style='text-align: center;'><div style='font-size: 12px; color: #888888; text-transform: uppercase;'>{label}</div><div style='font-size: 24px; font-weight: bold; color: #ffffff;'>{value:.1f}</div></div>"
+                for label, value in [
+                    ("PPG", float(row['ppg'])),
+                    ("RPG", float(row['rpg'])),
+                    ("APG", float(row['apg'])),
+                    ("SPG", float(row['spg'])),
+                    ("BPG", float(row['bpg'])),
+                ]
+            ])
+            season_card_html = "".join([
+                "<div style='background-color: #1e1e1e; border: 1px solid #333333; border-radius: 6px; padding: 15px; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);'>",
+                "<div style='display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 15px;'>",
+                f"<span style='font-size: 20px; font-weight: bold; color: #ff7b00;'>SEASON {int(row['season_number'])}</span>",
+                f"<span style='font-size: 16px; color: #aaaaaa; padding-top: 3px;'>{int(row['games_played'])} GP &nbsp;|&nbsp; <span style='color:#00ff00; font-weight: bold;'>{int(row['wins'])}W</span> - <span style='color:#ff4b4b; font-weight: bold;'>{int(row['losses'])}L</span></span>",
+                "</div>",
+                f"<div style='display: flex; justify-content: space-around; margin-bottom: 15px;'>{stat_html}</div>",
+                f"<div style='font-size: 14px; color: #ffd700; font-weight: bold; background-color: #2a2a2a; padding: 10px; border-radius: 4px; text-align: center;'>{awards_str}</div>",
+                "</div>",
+            ])
+            st.markdown(season_card_html, unsafe_allow_html=True)
     else:
         st.info("You haven't completed a season yet. End your current season to log your stats here.")
 
@@ -567,5 +850,13 @@ elif st.session_state.page == "career":
 
                     db.process_season_end(st.session_state.current_player_id, curr_season, stats_summary, aw_list,
                                           aw_payout)
+                    season_endorsements = db.fetch_df(
+                        "SELECT * FROM endorsements WHERE player_id = ? AND completed = 0",
+                        (st.session_state.current_player_id,))
+                    for _, endo in season_endorsements.iterrows():
+                        if season_award_endorsement_matches(endo['endorsement_name'], aw_list):
+                            payout = int(endo['payout'])
+                            db.complete_endorsement(st.session_state.current_player_id, endo['endorsement_name'], payout)
+                            st.toast(f"{endo['endorsement_name']} (+{payout:,} XP)", icon="🏆")
                     st.toast(f"Season {curr_season} completed! Earned {aw_payout:,} XP.", icon="🏆")
                     st.rerun()

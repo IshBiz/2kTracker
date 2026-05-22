@@ -5,6 +5,150 @@ import json
 
 DB_NAME = "nba2k_career.db"
 
+BASE_ENDORSEMENTS = [
+    ('Shoe Deal: The 40-Bomb', 'Score 40+ points in a single game.', 10000, 0),
+    ('National TV: 50-Point Game', 'Score 50+ points in a single game.', 25000, 0),
+    ('Energy Drink: Triple Double', 'Record double digits in 3 stat categories.', 15000, 0),
+    ('Cereal Box: Rainmaker', 'Make 10+ Three-Pointers in a single game.', 10000, 0),
+    ('Apparel Sponsor: Defensive Menace', 'Record 5+ Steals and 5+ Blocks in a single game.', 12000, 0),
+    ('State Farm: The Playmaker', 'Record 20+ Assists in a single game.', 15000, 0),
+    ('Gatorade: Board Man Gets Paid', 'Grab 25+ Rebounds in a single game.', 15000, 0),
+    ('Local Hero: 10 Games Played', 'Complete 10 career games.', 5000, 0)
+]
+
+ARCHETYPES = {
+    "balanced_star": {
+        "name": "Balanced Star",
+        "takeover": "Custom Takeover",
+        "description": "No discount, but no weakness. A flexible build for all-around careers.",
+        "discount_categories": [],
+        "discount_attributes": [],
+        "xp_bonus": "Standard XP rules.",
+        "endorsements": []
+    },
+    "sharpshooter": {
+        "name": "Sharpshooter",
+        "takeover": "Shooting Takeover",
+        "description": "Elite spacing and deep-range scoring.",
+        "discount_categories": [],
+        "discount_attributes": ["Three-Point Shot", "Mid-Range Shot", "Free Throw", "Post Fade", "Shot IQ",
+                                "Offensive Consistency"],
+        "xp_bonus": "Double XP impact for made threes.",
+        "endorsements": [
+            ('Foot Locker: Sniper Night', 'Make 12+ Three-Pointers in a single game.', 18000, 0),
+            ('Splash Brothers Feature', 'Score 35+ points with 8+ made threes.', 20000, 0),
+            ('Three-Point Crown Campaign', 'Win MVP as a Sharpshooter.', 30000, 0)
+        ]
+    },
+    "lockdown_defender": {
+        "name": "Lockdown Defender",
+        "takeover": "Defense Takeover",
+        "description": "Point-of-attack pressure, steals, blocks, and award-season defense.",
+        "discount_categories": ["Defense"],
+        "discount_attributes": ["Defensive Consistency", "Help Defense IQ", "Pass Perception"],
+        "xp_bonus": "Double XP impact for steals and blocks.",
+        "endorsements": [
+            ('Jordan Brand: Clamp Session', 'Record 7+ steals in a single game.', 16000, 0),
+            ('NBA Cares: No Fly Zone', 'Record 6+ blocks in a single game.', 16000, 0),
+            ('Kia Defensive Legacy', 'Win Defensive Player of the Year.', 30000, 0)
+        ]
+    },
+    "slashing_playmaker": {
+        "name": "Slashing Playmaker",
+        "takeover": "Finishing / Playmaking Takeover",
+        "description": "Rim pressure with enough passing to punish every collapse.",
+        "discount_categories": ["Playmaking"],
+        "discount_attributes": ["Driving Layup", "Driving Dunk", "Draw Foul", "Speed With Ball"],
+        "xp_bonus": "Bonus XP for assists and dunks.",
+        "endorsements": [
+            ('Sprite: Highlight Factory', 'Record 5+ dunks and 10+ assists in a single game.', 18000, 0),
+            ('And1: Rim Pressure', 'Attempt 12+ free throws in a single game.', 14000, 0),
+            ('Floor General Spotlight', 'Make All-NBA First Team as a Slashing Playmaker.', 22000, 0)
+        ]
+    },
+    "playmaking_shot_creator": {
+        "name": "Playmaking Shot Creator",
+        "takeover": "Shot Creator / Playmaking Takeover",
+        "description": "Self-created jumpers, handle packages, and table-setting offense.",
+        "discount_categories": ["Playmaking"],
+        "discount_attributes": ["Mid-Range Shot", "Three-Point Shot", "Ball Handle", "Speed With Ball"],
+        "xp_bonus": "Bonus XP for assists and made shots.",
+        "endorsements": [
+            ('Tissot: Shot Clock Killer', 'Score 30+ points with 10+ assists in a single game.', 22000, 0),
+            ('Ankle Tape Sponsor', 'Record 20+ assists in a single game.', 15000, 0),
+            ('MVP Campaign: Creator Edition', 'Win MVP as a Playmaking Shot Creator.', 30000, 0)
+        ]
+    },
+    "two_way_finisher": {
+        "name": "Two-Way Finisher",
+        "takeover": "Finishing / Defense Takeover",
+        "description": "Contact finishes on one end and disruptive stops on the other.",
+        "discount_categories": ["Defense"],
+        "discount_attributes": ["Driving Layup", "Driving Dunk", "Standing Dunk", "Vertical", "Strength"],
+        "xp_bonus": "Bonus XP for dunks, steals, and blocks.",
+        "endorsements": [
+            ('Above The Rim Mixtape', 'Record 8+ dunks in a single game.', 16000, 0),
+            ('Two-Way Takeover Feature', 'Score 25+ points with 3+ steals and 3+ blocks.', 22000, 0),
+            ('All-NBA Two-Way Bonus', 'Make All-NBA First Team as a Two-Way Finisher.', 22000, 0)
+        ]
+    },
+    "rim_protector": {
+        "name": "Rim Protector",
+        "takeover": "Defense / Rebounding Takeover",
+        "description": "Paint deterrence, block parties, and anchor-level defense.",
+        "discount_categories": ["Defense", "Rebounding"],
+        "discount_attributes": ["Strength", "Vertical", "Help Defense IQ"],
+        "xp_bonus": "Double XP impact for blocks and bonus XP for rebounds.",
+        "endorsements": [
+            ('Block Party Broadcast', 'Record 8+ blocks in a single game.', 20000, 0),
+            ('Paint Patrol Sponsor', 'Record 5+ blocks in a win.', 16000, 0),
+            ('Anchor of the Year', 'Win Defensive Player of the Year as a Rim Protector.', 30000, 0)
+        ]
+    },
+    "glass_cleaner": {
+        "name": "Glass Cleaner",
+        "takeover": "Rebounding Takeover",
+        "description": "Board control, extra possessions, and interior dirty work.",
+        "discount_categories": ["Rebounding"],
+        "discount_attributes": ["Strength", "Vertical", "Hustle", "Boxout Beast", "Rebound Chaser"],
+        "xp_bonus": "Double XP impact for rebounds.",
+        "endorsements": [
+            ('Board Man Elite', 'Grab 30+ rebounds in a single game.', 22000, 0),
+            ('Second-Chance Sponsor', 'Grab 10+ offensive rebounds in a single game.', 16000, 0),
+            ('Glass Work All-NBA Bonus', 'Make All-NBA First Team as a Glass Cleaner.', 22000, 0)
+        ]
+    },
+    "inside_out_scorer": {
+        "name": "Inside-Out Scorer",
+        "takeover": "Finishing / Shooting Takeover",
+        "description": "Three-level pressure: rim attacks, spot-up threes, and scoring bursts.",
+        "discount_categories": [],
+        "discount_attributes": ["Driving Layup", "Driving Dunk", "Three-Point Shot", "Mid-Range Shot",
+                                "Close Shot", "Free Throw"],
+        "xp_bonus": "Bonus XP for made threes and dunks.",
+        "endorsements": [
+            ('Three-Level Clinic', 'Score 40+ points with 4+ threes and 3+ dunks.', 22000, 0),
+            ('Offensive Threat Feature', 'Score 55+ points in a single game.', 26000, 0),
+            ('Scoring Champ MVP Push', 'Win MVP as an Inside-Out Scorer.', 30000, 0)
+        ]
+    }
+}
+
+
+def get_archetype(archetype_key):
+    return ARCHETYPES.get(archetype_key or "balanced_star", ARCHETYPES["balanced_star"])
+
+
+def get_endorsements_for_archetype(archetype_key):
+    return BASE_ENDORSEMENTS + get_archetype(archetype_key).get("endorsements", [])
+
+
+def get_attribute_discount(archetype_key, category, attribute_name):
+    archetype = get_archetype(archetype_key)
+    if category in archetype["discount_categories"] or attribute_name in archetype["discount_attributes"]:
+        return 0.8
+    return 1.0
+
 # ==========================================
 # 2K DYNAMIC OVR ENGINE MATRIX
 # ==========================================
@@ -61,7 +205,7 @@ def init_db():
         "CREATE TABLE IF NOT EXISTS badges (player_id INTEGER, category TEXT, badge_name TEXT, level INTEGER DEFAULT 0, PRIMARY KEY (player_id, badge_name))")
     # Updated: Added current_season
     cursor.execute(
-        "CREATE TABLE IF NOT EXISTS player_profile (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, position TEXT, jersey_number INTEGER, weight INTEGER, wingspan REAL, total_xp INTEGER DEFAULT 0, overall_rating INTEGER DEFAULT 60, current_season INTEGER DEFAULT 1)")
+        "CREATE TABLE IF NOT EXISTS player_profile (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, position TEXT, jersey_number INTEGER, weight INTEGER, wingspan REAL, total_xp INTEGER DEFAULT 0, overall_rating INTEGER DEFAULT 60, current_season INTEGER DEFAULT 1, archetype TEXT DEFAULT 'balanced_star')")
     cursor.execute(
         "CREATE TABLE IF NOT EXISTS endorsements (player_id INTEGER, endorsement_name TEXT, description TEXT, payout INTEGER, completed INTEGER DEFAULT 0, PRIMARY KEY (player_id, endorsement_name))")
 
@@ -100,16 +244,21 @@ def init_db():
                        INTEGER
                    )
                    """)
+    cursor.execute("PRAGMA table_info(player_profile)")
+    profile_columns = [row["name"] for row in cursor.fetchall()]
+    if "archetype" not in profile_columns:
+        cursor.execute("ALTER TABLE player_profile ADD COLUMN archetype TEXT DEFAULT 'balanced_star'")
+
     conn.commit()
     conn.close()
 
 
-def create_player(name, position, jersey, weight, wingspan):
+def create_player(name, position, jersey, weight, wingspan, archetype="balanced_star"):
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
-        "INSERT INTO player_profile (name, position, jersey_number, weight, wingspan, total_xp, overall_rating, current_season) VALUES (?, ?, ?, ?, ?, 0, 60, 1)",
-        (name, position, jersey, weight, wingspan))
+        "INSERT INTO player_profile (name, position, jersey_number, weight, wingspan, total_xp, overall_rating, current_season, archetype) VALUES (?, ?, ?, ?, ?, 0, 60, 1, ?)",
+        (name, position, jersey, weight, wingspan, archetype))
     player_id = cursor.lastrowid
 
     attrs = [
@@ -164,16 +313,7 @@ def create_player(name, position, jersey, weight, wingspan):
     ]
     cursor.executemany("INSERT INTO badges VALUES (?, ?, ?, ?)", badges)
 
-    endorsements = [
-        (player_id, 'Shoe Deal: The 40-Bomb', 'Score 40+ points in a single game.', 10000, 0),
-        (player_id, 'National TV: 50-Point Game', 'Score 50+ points in a single game.', 25000, 0),
-        (player_id, 'Energy Drink: Triple Double', 'Record double digits in 3 stat categories.', 15000, 0),
-        (player_id, 'Cereal Box: Rainmaker', 'Make 10+ Three-Pointers in a single game.', 10000, 0),
-        (player_id, 'Apparel Sponsor: Defensive Menace', 'Record 5+ Steals and 5+ Blocks in a single game.', 12000, 0),
-        (player_id, 'State Farm: The Playmaker', 'Record 20+ Assists in a single game.', 15000, 0),
-        (player_id, 'Gatorade: Board Man Gets Paid', 'Grab 25+ Rebounds in a single game.', 15000, 0),
-        (player_id, 'Local Hero: 10 Games Played', 'Complete 10 career games.', 5000, 0)
-    ]
+    endorsements = [(player_id, *endorsement) for endorsement in get_endorsements_for_archetype(archetype)]
     cursor.executemany("INSERT INTO endorsements VALUES (?, ?, ?, ?, ?)", endorsements)
 
     conn.commit()
@@ -192,6 +332,21 @@ def delete_player(player_id):
     cursor.execute("DELETE FROM season_records WHERE player_id = ?", (player_id,))
     conn.commit()
     conn.close()
+
+
+def set_player_archetype(player_id, archetype):
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE player_profile SET archetype = ? WHERE id = ?", (archetype, player_id))
+        endorsements = [(player_id, *endorsement) for endorsement in get_endorsements_for_archetype(archetype)]
+        cursor.executemany("INSERT OR IGNORE INTO endorsements VALUES (?, ?, ?, ?, ?)", endorsements)
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
 
 
 def insert_game(player_id, season_number, stats, xp_earned):
