@@ -310,6 +310,9 @@ if st.session_state.page == "landing":
             selected_archetype_name = st.selectbox("Archetype / Takeover", list(archetype_options.keys()))
             selected_archetype = db.get_archetype(archetype_options[selected_archetype_name])
             st.caption(f"{selected_archetype['takeover']} - {selected_archetype['description']} {selected_archetype['xp_bonus']}")
+            st.caption(
+                "Attributes will be randomized to match this overall while respecting the selected archetype."
+            )
             create_archetype_key = archetype_options[selected_archetype_name]
             next_challenge = db.get_coach_challenge(create_archetype_key, 0)
 
@@ -321,7 +324,7 @@ if st.session_state.page == "landing":
                     <div style='font-size:14px; color:#00ff99; font-weight:bold; margin-top:8px;'>Reward: +{int(next_challenge['bonus']):,} XP before game multiplier</div>
                 </div>
             """, unsafe_allow_html=True)
-            c1, c2, c3, c4 = st.columns(4)
+            c1, c2, c3, c4, c5 = st.columns(5)
             with c1:
                 jersey = st.number_input("Jersey", 0, 99, 0)
             with c2:
@@ -330,11 +333,13 @@ if st.session_state.page == "landing":
                 weight = st.number_input("Weight (lbs)", 150, 400, 220)
             with c4:
                 wingspan = st.number_input("Wingspan (ft)", min_value=5.0, max_value=9.0, value=6.8, format="%.1f")
+            with c5:
+                starting_ovr = st.number_input("Starting OVR", min_value=40, max_value=99, value=60)
 
             if st.form_submit_button("CREATE CAREER"):
                 if name:
                     new_id = db.create_player(name, pos, jersey, weight, wingspan,
-                                              archetype_options[selected_archetype_name], height)
+                                              archetype_options[selected_archetype_name], height, starting_ovr)
                     st.session_state.current_player_id = new_id
                     navigate("overview")
                     st.rerun()

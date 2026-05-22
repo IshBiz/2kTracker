@@ -378,6 +378,156 @@ OVR_WEIGHTS = {
 }
 
 
+ATTRIBUTE_TEMPLATE = [
+    ('Offense', 'Driving Layup', 55, 99, 1),
+    ('Offense', 'Post Fade', 40, 99, 2),
+    ('Offense', 'Post Hook', 40, 99, 2),
+    ('Offense', 'Post Control', 40, 99, 1),
+    ('Offense', 'Draw Foul', 50, 99, 1),
+    ('Offense', 'Close Shot', 55, 99, 1),
+    ('Offense', 'Standing Dunk', 40, 99, 1),
+    ('Offense', 'Driving Dunk', 55, 99, 2),
+    ('Offense', 'Mid-Range Shot', 40, 99, 2),
+    ('Offense', 'Three-Point Shot', 25, 99, 3),
+    ('Offense', 'Free Throw', 60, 99, 1),
+
+    ('Playmaking', 'Ball Handle', 45, 99, 2),
+    ('Playmaking', 'Pass IQ', 50, 99, 1),
+    ('Playmaking', 'Pass Accuracy', 50, 99, 2),
+    ('Playmaking', 'Shot IQ', 50, 99, 1),
+    ('Playmaking', 'Pass Vision', 50, 99, 1),
+    ('Playmaking', 'Hands', 50, 99, 1),
+
+    ('Defense', 'Interior Defense', 45, 99, 2),
+    ('Defense', 'Perimeter Defense', 45, 99, 2),
+    ('Defense', 'Block', 45, 99, 2),
+    ('Defense', 'Steal', 45, 99, 2),
+
+    ('Rebounding', 'Offensive Rebound', 45, 99, 2),
+    ('Rebounding', 'Defensive Rebound', 45, 99, 2),
+
+    ('Athleticism', 'Speed', 55, 99, 3),
+    ('Athleticism', 'Speed With Ball', 55, 99, 2),
+    ('Athleticism', 'Vertical', 55, 99, 2),
+    ('Athleticism', 'Strength', 50, 99, 1),
+    ('Athleticism', 'Stamina', 65, 99, 1),
+    ('Athleticism', 'Hustle', 60, 99, 1),
+    ('Athleticism', 'Agility', 55, 99, 2),
+
+    ('Mental', 'Pass Perception', 50, 99, 1),
+    ('Mental', 'Defensive Consistency', 50, 99, 1),
+    ('Mental', 'Help Defense IQ', 50, 99, 1),
+    ('Mental', 'Offensive Consistency', 50, 99, 1),
+]
+
+
+ARCHETYPE_ATTRIBUTE_RULES = {
+    "balanced_star": {
+        "strong_categories": ["Offense", "Playmaking", "Defense", "Athleticism"],
+        "weak_categories": [],
+        "minimums": {},
+    },
+
+    "sharpshooter": {
+        "strong_categories": ["Offense", "Mental"],
+        "weak_categories": ["Rebounding", "Defense"],
+        "minimums": {
+            "Mid-Range Shot": 65,
+            "Three-Point Shot": 75,
+            "Free Throw": 70,
+            "Shot IQ": 65,
+            "Offensive Consistency": 65,
+        },
+    },
+
+    "lockdown_defender": {
+        "strong_categories": ["Defense", "Mental", "Athleticism"],
+        "weak_categories": ["Offense"],
+        "minimums": {
+            "Perimeter Defense": 75,
+            "Steal": 70,
+            "Defensive Consistency": 70,
+            "Pass Perception": 65,
+            "Agility": 65,
+        },
+    },
+
+    "slashing_playmaker": {
+        "strong_categories": ["Offense", "Playmaking", "Athleticism"],
+        "weak_categories": ["Rebounding"],
+        "minimums": {
+            "Driving Layup": 70,
+            "Driving Dunk": 70,
+            "Ball Handle": 65,
+            "Pass Accuracy": 65,
+            "Speed": 70,
+            "Speed With Ball": 70,
+        },
+    },
+
+    "playmaking_shot_creator": {
+        "strong_categories": ["Offense", "Playmaking"],
+        "weak_categories": ["Rebounding"],
+        "minimums": {
+            "Mid-Range Shot": 70,
+            "Three-Point Shot": 65,
+            "Ball Handle": 70,
+            "Pass Accuracy": 65,
+            "Speed With Ball": 65,
+        },
+    },
+
+    "two_way_finisher": {
+        "strong_categories": ["Offense", "Defense", "Athleticism"],
+        "weak_categories": ["Rebounding"],
+        "minimums": {
+            "Driving Layup": 70,
+            "Driving Dunk": 75,
+            "Standing Dunk": 60,
+            "Perimeter Defense": 65,
+            "Steal": 60,
+            "Vertical": 70,
+        },
+    },
+
+    "rim_protector": {
+        "strong_categories": ["Defense", "Rebounding", "Athleticism"],
+        "weak_categories": ["Playmaking", "Offense"],
+        "minimums": {
+            "Interior Defense": 75,
+            "Block": 75,
+            "Defensive Rebound": 70,
+            "Strength": 70,
+            "Standing Dunk": 60,
+        },
+    },
+
+    "glass_cleaner": {
+        "strong_categories": ["Rebounding", "Athleticism", "Defense"],
+        "weak_categories": ["Playmaking"],
+        "minimums": {
+            "Offensive Rebound": 75,
+            "Defensive Rebound": 75,
+            "Strength": 70,
+            "Vertical": 65,
+            "Hustle": 65,
+        },
+    },
+
+    "inside_out_scorer": {
+        "strong_categories": ["Offense", "Athleticism"],
+        "weak_categories": ["Defense", "Rebounding"],
+        "minimums": {
+            "Driving Layup": 65,
+            "Driving Dunk": 65,
+            "Three-Point Shot": 65,
+            "Mid-Range Shot": 65,
+            "Close Shot": 60,
+        },
+    },
+}
+
+
 def calculate_ovr(position, attributes_dict):
     weights = OVR_WEIGHTS.get(position, {})
     total_weight = 0
@@ -389,6 +539,118 @@ def calculate_ovr(position, attributes_dict):
     if total_weight == 0: return 60
     return math.floor(weighted_sum / total_weight)
 
+
+def generate_random_attributes_for_ovr(position, archetype_key, target_ovr):
+    import random
+
+    target_ovr = int(target_ovr)
+    target_ovr = max(40, min(99, target_ovr))
+
+    rules = ARCHETYPE_ATTRIBUTE_RULES.get(
+        archetype_key,
+        ARCHETYPE_ATTRIBUTE_RULES["balanced_star"]
+    )
+
+    strong_categories = rules.get("strong_categories", [])
+    weak_categories = rules.get("weak_categories", [])
+    minimums = rules.get("minimums", {})
+
+    generated = {}
+
+    # First random pass
+    for category, attr_name, default_level, max_level, cost_multiplier in ATTRIBUTE_TEMPLATE:
+        max_level = int(max_level)
+
+        if category in strong_categories:
+            low = max(45, target_ovr - 10)
+            high = min(max_level, target_ovr + 14)
+        elif category in weak_categories:
+            low = 25
+            high = min(max_level, max(40, target_ovr - 8))
+        else:
+            low = max(30, target_ovr - 18)
+            high = min(max_level, target_ovr + 8)
+
+        if attr_name in minimums:
+            low = max(low, minimums[attr_name])
+
+        low = max(25, min(low, max_level))
+        high = max(low, min(high, max_level))
+
+        generated[attr_name] = random.randint(low, high)
+
+    # Fine-tune to target OVR
+    best_generated = generated.copy()
+    best_diff = abs(calculate_ovr(position, generated) - target_ovr)
+
+    max_attempts = 5000
+
+    for _ in range(max_attempts):
+        current_ovr = calculate_ovr(position, generated)
+        current_diff = abs(current_ovr - target_ovr)
+
+        if current_diff < best_diff:
+            best_generated = generated.copy()
+            best_diff = current_diff
+
+        if current_ovr == target_ovr:
+            return generated
+
+        if current_ovr < target_ovr:
+            candidates = []
+
+            for category, attr_name, default_level, max_level, cost_multiplier in ATTRIBUTE_TEMPLATE:
+                if generated[attr_name] >= max_level:
+                    continue
+
+                weight = OVR_WEIGHTS.get(position, {}).get(attr_name, 0.1)
+
+                priority = weight
+                if category in strong_categories:
+                    priority += 2.0
+                if category in weak_categories:
+                    priority -= 1.0
+
+                candidates.append((priority, attr_name, max_level))
+
+            if not candidates:
+                break
+
+            candidates.sort(reverse=True)
+            top_candidates = candidates[:10]
+            _, chosen_attr, max_level = random.choice(top_candidates)
+
+            generated[chosen_attr] = min(max_level, generated[chosen_attr] + 1)
+
+        else:
+            candidates = []
+
+            for category, attr_name, default_level, max_level, cost_multiplier in ATTRIBUTE_TEMPLATE:
+                min_allowed = minimums.get(attr_name, 25)
+
+                if generated[attr_name] <= min_allowed:
+                    continue
+
+                weight = OVR_WEIGHTS.get(position, {}).get(attr_name, 0.1)
+
+                priority = -weight
+                if category in weak_categories:
+                    priority += 3.0
+                if category in strong_categories:
+                    priority -= 3.0
+
+                candidates.append((priority, attr_name, min_allowed))
+
+            if not candidates:
+                break
+
+            candidates.sort(reverse=True)
+            top_candidates = candidates[:10]
+            _, chosen_attr, min_allowed = random.choice(top_candidates)
+
+            generated[chosen_attr] = max(min_allowed, generated[chosen_attr] - 1)
+
+    return best_generated
 
 # ==========================================
 # CORE DATABASE FUNCTIONS
@@ -525,40 +787,43 @@ def add_column_if_missing(cursor, table_name, column_name, column_definition):
     if column_name not in columns:
         cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_definition}")
 
-def create_player(name, position, jersey, weight, wingspan, archetype="balanced_star", height=""):
+def create_player(name, position, jersey, weight, wingspan, archetype="balanced_star", height="", starting_ovr=60):
     conn = get_connection()
     cursor = conn.cursor()
+
+    randomized_attributes = generate_random_attributes_for_ovr(
+        position,
+        archetype,
+        starting_ovr
+    )
+
+    actual_ovr = calculate_ovr(position, randomized_attributes)
+
     cursor.execute(
-        "INSERT INTO player_profile (name, position, jersey_number, weight, wingspan, total_xp, overall_rating, current_season, archetype, height) VALUES (?, ?, ?, ?, ?, 0, 60, 1, ?)",
-        (name, position, jersey, weight, wingspan, archetype, height))
+        """
+        INSERT INTO player_profile (
+            name, position, jersey_number, weight, wingspan,
+            total_xp, overall_rating, current_season, archetype, height
+        )
+        VALUES (?, ?, ?, ?, ?, 0, ?, 1, ?, ?)
+        """,
+        (name, position, jersey, weight, wingspan, int(actual_ovr), archetype, height)
+    )
+
     player_id = cursor.lastrowid
 
-    attrs = [
-        (player_id, 'Offense', 'Driving Layup', 55, 99, 1), (player_id, 'Offense', 'Post Fade', 40, 99, 2),
-        (player_id, 'Offense', 'Post Hook', 40, 99, 2), (player_id, 'Offense', 'Post Control', 40, 99, 1),
-        (player_id, 'Offense', 'Draw Foul', 50, 99, 1), (player_id, 'Offense', 'Close Shot', 55, 99, 1),
-        (player_id, 'Offense', 'Standing Dunk', 40, 99, 1), (player_id, 'Offense', 'Driving Dunk', 55, 99, 2),
-        (player_id, 'Offense', 'Mid-Range Shot', 40, 99, 2), (player_id, 'Offense', 'Three-Point Shot', 25, 99, 3),
-        (player_id, 'Offense', 'Free Throw', 60, 99, 1),
-        (player_id, 'Playmaking', 'Ball Handle', 45, 99, 2), (player_id, 'Playmaking', 'Pass IQ', 50, 99, 1),
-        (player_id, 'Playmaking', 'Pass Accuracy', 50, 99, 2), (player_id, 'Playmaking', 'Shot IQ', 50, 99, 1),
-        (player_id, 'Playmaking', 'Pass Vision', 50, 99, 1), (player_id, 'Playmaking', 'Hands', 50, 99, 1),
-        (player_id, 'Defense', 'Interior Defense', 45, 99, 2), (player_id, 'Defense', 'Perimeter Defense', 45, 99, 2),
-        (player_id, 'Defense', 'Block', 45, 99, 2), (player_id, 'Defense', 'Steal', 45, 99, 2),
-        (player_id, 'Rebounding', 'Offensive Rebound', 45, 99, 2),
-        (player_id, 'Rebounding', 'Defensive Rebound', 45, 99, 2),
-        (player_id, 'Athleticism', 'Speed', 55, 99, 3), (player_id, 'Athleticism', 'Speed With Ball', 55, 99, 2),
-        (player_id, 'Athleticism', 'Vertical', 55, 99, 2), (player_id, 'Athleticism', 'Strength', 50, 99, 1),
-        (player_id, 'Athleticism', 'Stamina', 65, 99, 1), (player_id, 'Athleticism', 'Hustle', 60, 99, 1),
-        (player_id, 'Athleticism', 'Agility', 55, 99, 2), (player_id, 'Mental', 'Pass Perception', 50, 99, 1),
-        (player_id, 'Mental', 'Defensive Consistency', 50, 99, 1), (player_id, 'Mental', 'Help Defense IQ', 50, 99, 1),
-        (player_id, 'Mental', 'Offensive Consistency', 50, 99, 1)
-    ]
-    cursor.executemany("INSERT INTO player_attributes VALUES (?, ?, ?, ?, ?, ?)", attrs)
+    attribute_rows = []
+    for category, attr_name, default_level, max_level, cost_multiplier in ATTRIBUTE_TEMPLATE:
+        starting_level = randomized_attributes.get(attr_name, default_level)
 
-    attr_dict = {a[2]: a[3] for a in attrs}
-    starting_ovr = calculate_ovr(position, attr_dict)
-    cursor.execute("UPDATE player_profile SET overall_rating = ? WHERE id = ?", (starting_ovr, player_id))
+        attribute_rows.append(
+            (player_id, category, attr_name, int(starting_level), int(max_level), int(cost_multiplier))
+        )
+
+    cursor.executemany(
+        "INSERT INTO player_attributes VALUES (?, ?, ?, ?, ?, ?)",
+        attribute_rows
+    )
 
     badges = [
         (player_id, 'Finishing', 'Float Game', 0), (player_id, 'Finishing', 'Posterizer', 0),
@@ -583,10 +848,19 @@ def create_player(name, position, jersey, weight, wingspan, archetype="balanced_
         (player_id, 'Athleticism', 'Brick Wall', 0), (player_id, 'Athleticism', 'Immovable Enforcer', 0),
         (player_id, 'Rebounding', 'Boxout Beast', 0), (player_id, 'Rebounding', 'Rebound Chaser', 0)
     ]
-    cursor.executemany("INSERT INTO badges VALUES (?, ?, ?, ?)", badges)
+
+    cursor.executemany(
+        "INSERT INTO badges VALUES (?, ?, ?, ?)",
+        badges
+    )
 
     endorsements = [(player_id, *endorsement) for endorsement in get_endorsements_for_archetype(archetype)]
-    cursor.executemany("INSERT INTO endorsements VALUES (?, ?, ?, ?, ?)", endorsements)
+
+    cursor.executemany(
+        "INSERT INTO endorsements VALUES (?, ?, ?, ?, ?)",
+        endorsements
+    )
+
     tendency_rows = []
     for category, tendencies in TENDENCY_CATEGORIES.items():
         for tendency in tendencies:
@@ -598,7 +872,7 @@ def create_player(name, position, jersey, weight, wingspan, archetype="balanced_
         "INSERT OR IGNORE INTO tendencies VALUES (?, ?, ?, ?)",
         tendency_rows
     )
-    
+
     conn.commit()
     conn.close()
     return player_id
