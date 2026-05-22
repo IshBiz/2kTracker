@@ -316,6 +316,12 @@ if st.session_state.page == "landing":
             create_archetype_key = archetype_options[selected_archetype_name]
             sample_challenge = db.get_coach_challenge(create_archetype_key, 0)
 
+            creation_mode = st.radio(
+                "Attribute Setup",
+                ["Randomized by Archetype", "Manual / Import from 2K26"],
+                horizontal=True
+            )
+
             st.markdown(f"""
                 <div style='background-color:#221a10; border:1px solid #ff7b00; border-radius:8px; padding:14px; margin-top:10px;'>
                     <div style='font-size:13px; color:#ffb066; text-transform:uppercase; font-weight:bold;'>Sample Coach's Challenge</div>
@@ -334,12 +340,63 @@ if st.session_state.page == "landing":
             with c4:
                 wingspan = st.number_input("Wingspan (ft)", min_value=5.0, max_value=9.0, value=6.8, format="%.1f")
             with c5:
-                starting_ovr = st.number_input("Starting OVR", min_value=40, max_value=99, value=60)
+                manual_attributes = None
+
+                if creation_mode == "Randomized by Archetype":
+                    starting_ovr = st.number_input(
+                        "Starting OVR",
+                        min_value=40,
+                        max_value=99,
+                        value=60
+                    )
+
+                    st.caption(
+                        "Attributes will be randomized to match this overall while respecting the selected archetype."
+                    )
+
+                else:
+                    starting_ovr = 60
+
+                    st.info(
+                        "Manual mode lets you copy attributes from your actual NBA 2K26 player. "
+                        "The app will calculate the overall from the values you enter."
+                    )
+            if creation_mode == "Manual / Import from 2K26":
+                manual_attributes = {}
+
+                st.markdown("### Manual Attributes")
+
+                attr_template = db.get_attribute_template()
+
+                categories = {}
+                for category, attr_name, default_level, max_level, cost_multiplier in attr_template:
+                    categories.setdefault(category, []).append(
+                        (attr_name, default_level, max_level, cost_multiplier)
+                    )
+
+                for category, attrs in categories.items():
+                    with st.expander(category, expanded=(category in ["Offense", "Playmaking"])):
+                        cols = st.columns(2)
+
+                        for i, (attr_name, default_level, max_level, cost_multiplier) in enumerate(attrs):
+                            with cols[i % 2]:
+                                manual_attributes[attr_name] = st.number_input(
+                                    attr_name,
+                                    min_value=25,
+                                    max_value=int(max_level),
+                                    value=int(default_level),
+                                    key=f"manual_attr_{attr_name}"
+                                )
+
+                preview_ovr = db.calculate_ovr(pos, manual_attributes)
+
+                st.success(f"Calculated Starting Overall: {preview_ovr}")
+
 
             if st.form_submit_button("CREATE CAREER"):
                 if name:
                     new_id = db.create_player(name, pos, jersey, weight, wingspan,
-                                              archetype_options[selected_archetype_name], height, starting_ovr)
+                                              archetype_options[selected_archetype_name], height, starting_ovr, manual_attributes)
                     st.session_state.current_player_id = new_id
                     navigate("overview")
                     st.rerun()

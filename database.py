@@ -149,6 +149,9 @@ def get_attribute_discount(archetype_key, category, attribute_name):
         return 0.8
     return 1.0
 
+def get_attribute_template():
+    return ATTRIBUTE_TEMPLATE
+
 
 COACH_CHALLENGES = {
     "balanced_star": [
@@ -988,17 +991,20 @@ def add_column_if_missing(cursor, table_name, column_name, column_definition):
     if column_name not in columns:
         cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_definition}")
 
-def create_player(name, position, jersey, weight, wingspan, archetype="balanced_star", height="", starting_ovr=60):
+def create_player(name, position, jersey, weight, wingspan, archetype="balanced_star", height="", starting_ovr=60, manual_attributes=None):
     conn = get_connection()
     cursor = conn.cursor()
 
-    randomized_attributes = generate_random_attributes_for_ovr(
-        position,
-        archetype,
-        starting_ovr
-    )
+    if manual_attributes:
+        final_attributes = manual_attributes
+    else:
+        final_attributes = generate_random_attributes_for_ovr(
+            position,
+            archetype,
+            starting_ovr
+        )
 
-    actual_ovr = calculate_ovr(position, randomized_attributes)
+    actual_ovr = calculate_ovr(position, final_attributes)
 
     cursor.execute(
         """
@@ -1015,7 +1021,9 @@ def create_player(name, position, jersey, weight, wingspan, archetype="balanced_
 
     attribute_rows = []
     for category, attr_name, default_level, max_level, cost_multiplier in ATTRIBUTE_TEMPLATE:
-        starting_level = randomized_attributes.get(attr_name, default_level)
+        starting_level = final_attributes.get(attr_name, default_level)
+
+        starting_level = max(25, min(int(starting_level), int(max_level)))
 
         attribute_rows.append(
             (player_id, category, attr_name, int(starting_level), int(max_level), int(cost_multiplier))
